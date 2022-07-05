@@ -83,6 +83,8 @@ source_set("ui") {
     "painting/shader.h",
     "painting/single_frame_codec.cc",
     "painting/single_frame_codec.h",
+    "painting/texture_descriptor.cc",
+    "painting/texture_descriptor.h",
     "painting/vertices.cc",
     "painting/vertices.h",
     "plugins/callback_cache.cc",

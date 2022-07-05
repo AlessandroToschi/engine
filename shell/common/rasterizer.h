@@ -486,6 +486,9 @@ class Rasterizer final : public SnapshotDelegate,
   // |SnapshotDelegate|
   sk_sp<SkImage> ConvertToRasterImage(sk_sp<SkImage> image) override;
 
+  sk_sp<SkImage> UploadTexture(
+      std::shared_ptr<TextureDescriptor>& descriptor) override;
+
   // |Stopwatch::Delegate|
   /// Time limit for a smooth frame.
   ///

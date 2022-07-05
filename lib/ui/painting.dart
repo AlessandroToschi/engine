@@ -1666,6 +1666,10 @@ class Image {
   /// The number of image pixels along the image's vertical axis.
   final int height;
 
+  static List<Image?> fromTextures(List<TextureDescriptor> textureDescriptors) {
+    return _Image.fromTextures(textureDescriptors.map((e) => e._rawValues).toList(growable: false)).map((_Image?_image) => _image != null ? Image._(_image) : null).toList(growable: false);
+  }
+
   bool _disposed = false;
   /// Release this handle's claim on the underlying Image. This handle is no
   /// longer usable after this method is called.
@@ -1846,6 +1850,8 @@ class _Image extends NativeFieldWrapperClass1 {
 
   int get height native 'Image_height';
 
+  static List<_Image?> fromTextures(List<Int64List> textureDescriptors) native 'Image_FromTextures';
+
   Future<ByteData?> toByteData({ImageByteFormat format = ImageByteFormat.rawRgba}) {
     return _futurize((_Callback<ByteData> callback) {
       return _toByteData(format.index, (Uint8List? encoded) {
@@ -1881,6 +1887,23 @@ class _Image extends NativeFieldWrapperClass1 {
 
 /// Callback signature for [decodeImageFromList].
 typedef ImageDecoderCallback = void Function(Image result);
+
+@pragma('vm:entry-point')
+class TextureDescriptor {
+
+  @pragma('vm:entry-point')
+  TextureDescriptor._(this._rawValues);
+
+  static TextureDescriptor fromTextureId(int textureId, int width, int height, { PixelFormat pixelFormat = PixelFormat.rgba8888 }) {
+    return TextureDescriptor._(Int64List.fromList([0, textureId, width, height, pixelFormat.index]));
+  }
+
+  static TextureDescriptor fromTexturePointer(int texturePointer, int width, int height, { PixelFormat pixelFormat = PixelFormat.bgra8888 }) {
+    return TextureDescriptor._(Int64List.fromList([1, texturePointer, width, height, pixelFormat.index]));
+  }
+
+  final Int64List _rawValues;
+}
 
 /// Information for a single frame of an animation.
 ///

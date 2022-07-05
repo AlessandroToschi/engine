@@ -5,6 +5,7 @@
 #ifndef FLUTTER_LIB_UI_SNAPSHOT_DELEGATE_H_
 #define FLUTTER_LIB_UI_SNAPSHOT_DELEGATE_H_
 
+#include "flutter/lib/ui/painting/texture_descriptor.h"
 #include <string>
 
 #include "flutter/display_list/display_list.h"
@@ -28,6 +29,9 @@ class SnapshotDelegate {
                                             SkISize picture_size) = 0;
 
   virtual sk_sp<SkImage> ConvertToRasterImage(sk_sp<SkImage> image) = 0;
+
+  virtual sk_sp<SkImage> UploadTexture(
+      std::shared_ptr<TextureDescriptor>& descriptor) = 0;
 };
 
 }  // namespace flutter

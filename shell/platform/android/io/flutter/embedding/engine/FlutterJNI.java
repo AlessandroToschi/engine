@@ -27,6 +27,7 @@ import io.flutter.embedding.engine.deferredcomponents.DeferredComponentManager;
 import io.flutter.embedding.engine.mutatorsstack.FlutterMutatorsStack;
 import io.flutter.embedding.engine.renderer.FlutterUiDisplayListener;
 import io.flutter.embedding.engine.renderer.SurfaceTextureWrapper;
+import io.flutter.embedding.engine.renderer.Task;
 import io.flutter.plugin.common.StandardMessageCodec;
 import io.flutter.plugin.localization.LocalizationPlugin;
 import io.flutter.plugin.platform.PlatformViewsController;
@@ -848,6 +849,24 @@ public class FlutterJNI {
 
   private native void nativeSetAccessibilityFeatures(long nativeShellHolderId, int flags);
   // ------ End Accessibility Support ----
+
+  // ------ Start Run on IO Thread Scheduling -----
+
+  public void runOnIOThread(@NonNull Task task) {
+    ensureAttachedToNative();
+    nativeRunOnIOThread(nativeShellHolderId, task);
+  }
+
+  private native void nativeRunOnIOThread(long nativeShellHolderId, @NonNull Task task);
+
+  public void runOnRasterThread(@NonNull Task task) {
+    ensureAttachedToNative();
+    nativeRunOnRasterThread(nativeShellHolderId, task);
+  }
+
+  private native void nativeRunOnRasterThread(long nativeShellHolderId, @NonNull Task task);
+
+  // ------ End Run on IO Thread Scheduling -----
 
   // ------ Start Texture Registration Support -----
   /**

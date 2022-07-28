@@ -411,6 +411,26 @@ sk_sp<SkImage> Rasterizer::UploadTexture(
       reinterpret_cast<void*>(_backendTexture));
 }
 
+sk_sp<SkSurface> Rasterizer::MakeSurface(int32_t width,
+                                         int32_t height,
+                                         int64_t raw_texture) {
+#if SK_GL
+  return SkSurface::MakeRenderTarget(
+      surface_->GetContext(), SkBudgeted::kNo,
+      SkImageInfo::MakeN32Premul({width, height}));
+#else
+  return nullptr;
+#endif
+}
+
+RasterCache* Rasterizer::GetRasterCache() {
+  return &compositor_context_->raster_cache();
+}
+
+GrDirectContext* Rasterizer::GetContext() {
+  return surface_->GetContext();
+}
+
 fml::Milliseconds Rasterizer::GetFrameBudget() const {
   return delegate_.GetFrameBudget();
 };

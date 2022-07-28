@@ -471,6 +471,14 @@ class Rasterizer final : public SnapshotDelegate,
   sk_sp<SkImage> UploadTexture(
       std::shared_ptr<TextureDescriptor>& descriptor) override;
 
+  sk_sp<SkSurface> MakeSurface(int32_t width,
+                               int32_t height,
+                               int64_t raw_texture) override;
+
+  RasterCache* GetRasterCache() override;
+
+  GrDirectContext* GetContext() override;
+
   // |Stopwatch::Delegate|
   /// Time limit for a smooth frame.
   ///

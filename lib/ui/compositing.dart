@@ -41,7 +41,17 @@ class Scene extends NativeFieldWrapperClass1 {
     );
   }
 
+  Future<void> renderToSurface(int width, int height, RenderSurface renderSurface) {
+    final Completer<void> completer = Completer<void>.sync();
+    _renderToSurface(width, height, renderSurface, () {
+      completer.complete();
+    });
+    return completer.future;
+  }
+
   String? _toImage(int width, int height, _Callback<_Image?> callback) native 'Scene_toImage';
+
+  void _renderToSurface(int width, int height, RenderSurface renderSurface, void Function() callback) native 'Scene_renderToSurface';
 
   /// Releases the resources used by this scene.
   ///

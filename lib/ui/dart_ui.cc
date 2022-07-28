@@ -24,6 +24,7 @@
 #include "flutter/lib/ui/painting/path_measure.h"
 #include "flutter/lib/ui/painting/picture.h"
 #include "flutter/lib/ui/painting/picture_recorder.h"
+#include "flutter/lib/ui/painting/render_surface.h"
 #include "flutter/lib/ui/painting/vertices.h"
 #include "flutter/lib/ui/semantics/semantics_update.h"
 #include "flutter/lib/ui/semantics/semantics_update_builder.h"
@@ -78,6 +79,7 @@ void DartUI::InitForGlobal() {
     ParagraphBuilder::RegisterNatives(g_natives);
     Picture::RegisterNatives(g_natives);
     PictureRecorder::RegisterNatives(g_natives);
+    RenderSurface::RegisterNatives(g_natives);
     Scene::RegisterNatives(g_natives);
     SceneBuilder::RegisterNatives(g_natives);
     SemanticsUpdate::RegisterNatives(g_natives);

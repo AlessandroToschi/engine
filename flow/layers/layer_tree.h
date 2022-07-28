@@ -17,6 +17,14 @@
 
 namespace flutter {
 
+class RenderSurfaceProvider {
+ public:
+  virtual SkCanvas* get_canvas() = 0;
+  virtual RasterCache* get_raster_cache() = 0;
+  virtual GrDirectContext* get_context() = 0;
+  virtual SkColorSpace* get_color_space() = 0;
+};
+
 class LayerTree {
  public:
   LayerTree(const SkISize& frame_size, float device_pixel_ratio);
@@ -36,6 +44,8 @@ class LayerTree {
              bool ignore_raster_cache = false) const;
 
   sk_sp<SkPicture> Flatten(const SkRect& bounds);
+
+  void Flatten(const SkRect& bounds, RenderSurfaceProvider* render_surface);
 
   Layer* root_layer() const { return root_layer_.get(); }
 

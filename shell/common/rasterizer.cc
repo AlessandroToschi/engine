@@ -23,6 +23,10 @@
 #include "third_party/skia/include/core/SkSurfaceCharacterization.h"
 #include "third_party/skia/include/utils/SkBase64.h"
 
+#if SK_GL
+#include "third_party/skia/include/gpu/gl/GrGLTypes.h"
+#endif
+
 sk_sp<SkPromiseImageTexture> get_promise_texture(
     SkImage::PromiseImageTextureContext textureContext) {
   auto backendTexture = reinterpret_cast<GrBackendTexture*>(textureContext);
@@ -415,9 +419,18 @@ sk_sp<SkSurface> Rasterizer::MakeSurface(int32_t width,
                                          int32_t height,
                                          int64_t raw_texture) {
 #if SK_GL
-  return SkSurface::MakeRenderTarget(
-      surface_->GetContext(), SkBudgeted::kNo,
-      SkImageInfo::MakeN32Premul({width, height}));
+  GrGLTextureInfo tInfo;
+  tInfo.fTarget = 0x0DE1;  // GR_GL_TEXTURE2D_2D;
+  tInfo.fID = raw_texture;
+  tInfo.fFormat = 0x8058;  // GR_GL_RGBA8;
+  const GrBackendTexture tex(width, height, GrMipmapped::kNo, tInfo);
+  const auto colorSpace(SkColorSpace::MakeSRGB());
+
+  sk_sp<SkSurface> surface(SkSurface::MakeFromBackendTexture(
+      surface_->GetContext(), tex, kBottomLeft_GrSurfaceOrigin, 1,
+      kRGBA_8888_SkColorType, colorSpace, nullptr, nullptr, nullptr));
+
+  return surface;
 #else
   return nullptr;
 #endif

@@ -64,15 +64,6 @@ void RenderSurface::setup(int32_t width, int32_t height, Dart_Handle callback) {
         _raster_cache = snapshot_delegate->GetRasterCache();
         _context = snapshot_delegate->GetContext();
         _color_space = SkColorSpace::MakeSRGB();
-#if SK_GL
-        const auto render_target = _surface->getBackendRenderTarget(
-            SkSurface::kDiscardWrite_BackendHandleAccess);
-        if (render_target.isValid()) {
-          GrGLFramebufferInfo info;
-          render_target.getGLFramebufferInfo(&info);
-          _raw_texture = info.fFBOID;
-        }
-#endif
         fml::TaskRunner::RunNowOrPostTask(std::move(ui_task_runner),
                                           std::move(ui_task));
       });

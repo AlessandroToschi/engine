@@ -222,5 +222,4 @@ sk_sp<DisplayList> LayerTree::Flatten(const SkRect& bounds) {
 
   return builder.Build();
 }
-
 }  // namespace flutter

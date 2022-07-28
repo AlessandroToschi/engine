@@ -172,6 +172,7 @@ class GdbClient(object):
         for command in eval_commands:
             exec_command += ['--eval-command', command]
 
+        print(exec_command)
         os.execv(exec_command[0], exec_command)
 
 

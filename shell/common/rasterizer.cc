@@ -23,6 +23,10 @@
 #include "third_party/skia/include/core/SkSurfaceCharacterization.h"
 #include "third_party/skia/include/utils/SkBase64.h"
 
+#if SK_GL
+#include "third_party/skia/include/gpu/gl/GrGLTypes.h"
+#endif
+
 sk_sp<SkPromiseImageTexture> get_promise_texture(
     SkImage::PromiseImageTextureContext textureContext) {
   auto backendTexture = reinterpret_cast<GrBackendTexture*>(textureContext);
@@ -411,6 +415,35 @@ sk_sp<SkImage> Rasterizer::UploadTexture(
       reinterpret_cast<void*>(_backendTexture));
 }
 
+sk_sp<SkSurface> Rasterizer::MakeSurface(int32_t width,
+                                         int32_t height,
+                                         int64_t raw_texture) {
+#if SK_GL
+  GrGLTextureInfo tInfo;
+  tInfo.fTarget = 0x0DE1;  // GR_GL_TEXTURE2D_2D;
+  tInfo.fID = raw_texture;
+  tInfo.fFormat = 0x8058;  // GR_GL_RGBA8;
+  const GrBackendTexture tex(width, height, GrMipmapped::kNo, tInfo);
+  const auto colorSpace(SkColorSpace::MakeSRGB());
+
+  sk_sp<SkSurface> surface(SkSurface::MakeFromBackendTexture(
+      surface_->GetContext(), tex, kBottomLeft_GrSurfaceOrigin, 1,
+      kRGBA_8888_SkColorType, colorSpace, nullptr, nullptr, nullptr));
+
+  return surface;
+#else
+  return nullptr;
+#endif
+}
+
+RasterCache* Rasterizer::GetRasterCache() {
+  return &compositor_context_->raster_cache();
+}
+
+GrDirectContext* Rasterizer::GetContext() {
+  return surface_->GetContext();
+}
+
 fml::Milliseconds Rasterizer::GetFrameBudget() const {
   return delegate_.GetFrameBudget();
 };
@@ -650,6 +683,37 @@ RasterStatus Rasterizer::DrawToSurfaceUnsafe(
   }
 
   return RasterStatus::kFailed;
+}
+
+void Rasterizer::DrawLayerToSurface(flutter::LayerTree* tree,
+                                    OffscreenSurface* snapshot_surface) {
+  // Draw the current layer tree into the snapshot surface.
+  auto* canvas = snapshot_surface->GetCanvas();
+
+  // There is no root surface transformation for the screenshot layer. Reset the
+  // matrix to identity.
+  SkMatrix root_surface_transformation;
+  root_surface_transformation.reset();
+
+  // snapshot_surface->makeImageSnapshot needs the GL context to be set if the
+  // render context is GL. frame->Raster() pops the gl context in platforms that
+  // gl context switching are used. (For example, older iOS that uses GL) We
+  // reset the GL context using the context switch.
+  auto context_switch = surface_->MakeRenderContextCurrent();
+
+  auto frame = compositor_context_->AcquireFrame(
+      surface_->GetContext(),       // skia context
+      canvas,                       // canvas
+      nullptr,                      // view embedder
+      root_surface_transformation,  // root surface transformation
+      false,                        // instrumentation enabled
+      true,                         // render buffer readback supported
+      nullptr,                      // thread merger
+      nullptr                       // display list builder
+  );
+  canvas->clear(SK_ColorTRANSPARENT);
+  frame->Raster(*tree, false, nullptr);
+  canvas->flush();
 }
 
 static sk_sp<SkData> ScreenshotLayerTreeAsPicture(

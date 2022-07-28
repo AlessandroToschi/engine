@@ -155,5 +155,4 @@ sk_sp<SkPicture> LayerTree::Flatten(const SkRect& bounds) {
 
   return recorder.finishRecordingAsPicture();
 }
-
 }  // namespace flutter

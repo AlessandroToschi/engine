@@ -1,8 +1,7 @@
 #ifndef FLUTTER_LIB_UI_PAINTING_SURFACE_H_
 #define FLUTTER_LIB_UI_PAINTING_SURFACE_H_
 
-#include "flutter/flow/layers/layer_tree.h"
-#include "flutter/flow/raster_cache.h"
+#include "flutter/flow/layers/offscreen_surface.h"
 #include "flutter/lib/ui/dart_wrapper.h"
 #include "third_party/skia/include/core/SkSurface.h"
 
@@ -12,8 +11,7 @@ class DartLibraryNatives;
 
 namespace flutter {
 
-class RenderSurface : public RefCountedDartWrappable<RenderSurface>,
-                      public RenderSurfaceProvider {
+class RenderSurface : public RefCountedDartWrappable<RenderSurface> {
   DEFINE_WRAPPERTYPEINFO();
   FML_FRIEND_MAKE_REF_COUNTED(RenderSurface);
 
@@ -27,19 +25,15 @@ class RenderSurface : public RefCountedDartWrappable<RenderSurface>,
 
   int64_t raw_texture();
 
-  SkCanvas* get_canvas() override;
-  RasterCache* get_raster_cache() override;
-  GrDirectContext* get_context() override;
-  SkColorSpace* get_color_space() override;
+  void dispose(Dart_Handle callback);
+
+  OffscreenSurface* get_offscreen_surface();
 
  private:
   RenderSurface(int64_t raw_texture);
 
-  sk_sp<SkSurface> _surface;
+  std::unique_ptr<OffscreenSurface> _surface;
   int64_t _raw_texture;
-  RasterCache* _raster_cache;
-  GrDirectContext* _context;
-  sk_sp<SkColorSpace> _color_space;
 };
 
 }  // namespace flutter

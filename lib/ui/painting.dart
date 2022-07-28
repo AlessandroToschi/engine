@@ -5703,6 +5703,16 @@ class RenderSurface extends NativeFieldWrapperClass1 {
 
   void constructor(int texture) native 'RenderSurface_constructor';
   void setup(int width, int height, void Function() callback) native 'RenderSurface_setup';
+
+  Future<void> dispose() async {
+    final Completer<void> completer = Completer<void>.sync();
+    _dispose(() {
+      completer.complete();
+    });
+    return completer.future;
+  }
+  void _dispose(void Function() callback) native 'RenderSurface_dispose';
+
   int rawTexture() native 'RenderSurface_raw_texture';
 }
 

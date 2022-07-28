@@ -685,6 +685,37 @@ RasterStatus Rasterizer::DrawToSurfaceUnsafe(
   return RasterStatus::kFailed;
 }
 
+void Rasterizer::DrawLayerToSurface(flutter::LayerTree* tree,
+                                    OffscreenSurface* snapshot_surface) {
+  // Draw the current layer tree into the snapshot surface.
+  auto* canvas = snapshot_surface->GetCanvas();
+
+  // There is no root surface transformation for the screenshot layer. Reset the
+  // matrix to identity.
+  SkMatrix root_surface_transformation;
+  root_surface_transformation.reset();
+
+  // snapshot_surface->makeImageSnapshot needs the GL context to be set if the
+  // render context is GL. frame->Raster() pops the gl context in platforms that
+  // gl context switching are used. (For example, older iOS that uses GL) We
+  // reset the GL context using the context switch.
+  auto context_switch = surface_->MakeRenderContextCurrent();
+
+  auto frame = compositor_context_->AcquireFrame(
+      surface_->GetContext(),       // skia context
+      canvas,                       // canvas
+      nullptr,                      // view embedder
+      root_surface_transformation,  // root surface transformation
+      false,                        // instrumentation enabled
+      true,                         // render buffer readback supported
+      nullptr,                      // thread merger
+      nullptr                       // display list builder
+  );
+  canvas->clear(SK_ColorTRANSPARENT);
+  frame->Raster(*tree, false, nullptr);
+  canvas->flush();
+}
+
 static sk_sp<SkData> ScreenshotLayerTreeAsPicture(
     flutter::LayerTree* tree,
     flutter::CompositorContext& compositor_context) {

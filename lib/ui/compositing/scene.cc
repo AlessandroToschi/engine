@@ -96,6 +96,7 @@ void Scene::renderToSurface(int32_t width,
       dart_state->GetTaskRunners().GetRasterTaskRunner();
   auto persistent_callback =
       std::make_unique<tonic::DartPersistentValue>(dart_state, callback);
+  const auto snapshot_delegate = dart_state->GetSnapshotDelegate();
 
   const auto ui_task = fml::MakeCopyable(
       [persistent_callback = std::move(persistent_callback)]() mutable {
@@ -110,10 +111,9 @@ void Scene::renderToSurface(int32_t width,
 
   const auto raster_task = fml::MakeCopyable(
       [ui_task = std::move(ui_task), ui_task_runner = std::move(ui_task_runner),
-       this, width, height, render_surface]() {
-        layer_tree_->Flatten(SkRect::MakeWH(width, height),
-                             render_surface.get());
-        render_surface->get_canvas()->flush();
+       this, render_surface, snapshot_delegate]() {
+        snapshot_delegate->DrawLayerToSurface(
+            layer_tree_.get(), render_surface->get_offscreen_surface());
         fml::TaskRunner::RunNowOrPostTask(std::move(ui_task_runner),
                                           std::move(ui_task));
       });

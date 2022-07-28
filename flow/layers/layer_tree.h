@@ -45,8 +45,6 @@ class LayerTree {
 
   sk_sp<SkPicture> Flatten(const SkRect& bounds);
 
-  void Flatten(const SkRect& bounds, RenderSurfaceProvider* render_surface);
-
   Layer* root_layer() const { return root_layer_.get(); }
 
   void set_root_layer(std::shared_ptr<Layer> root_layer) {

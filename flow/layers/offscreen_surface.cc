@@ -70,6 +70,26 @@ OffscreenSurface::OffscreenSurface(GrDirectContext* surface_context,
   offscreen_surface_ = CreateSnapshotSurface(surface_context, size);
 }
 
+OffscreenSurface::OffscreenSurface(int64_t texture_id,
+                                   GrDirectContext* surface_context,
+                                   const SkISize& size) {
+#if SK_GL
+  GrGLTextureInfo tInfo;
+  tInfo.fTarget = 0x0DE1;  // GR_GL_TEXTURE2D_2D;
+  tInfo.fID = texture_id;
+  tInfo.fFormat = 0x8058;  // GR_GL_RGBA8;
+  const GrBackendTexture tex(size.width(), size.height(), GrMipmapped::kNo,
+                             tInfo);
+  const auto colorSpace(SkColorSpace::MakeSRGB());
+  offscreen_surface_ = SkSurface::MakeFromBackendTexture(
+      reinterpret_cast<GrRecordingContext*>(surface_context), tex,
+      kBottomLeft_GrSurfaceOrigin, 1, kRGBA_8888_SkColorType, colorSpace,
+      nullptr, nullptr, nullptr);
+#else
+  offscreen_surface_ = nullptr;
+#endif
+}
+
 sk_sp<SkData> OffscreenSurface::GetRasterData(bool compressed) const {
   return flutter::GetRasterData(offscreen_surface_, compressed);
 }

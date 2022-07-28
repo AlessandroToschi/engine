@@ -471,6 +471,14 @@ class Rasterizer final : public SnapshotDelegate,
   sk_sp<SkImage> UploadTexture(
       std::shared_ptr<TextureDescriptor>& descriptor) override;
 
+  sk_sp<SkSurface> MakeSurface(int32_t width,
+                               int32_t height,
+                               int64_t raw_texture) override;
+
+  RasterCache* GetRasterCache() override;
+
+  GrDirectContext* GetContext() override;
+
   // |Stopwatch::Delegate|
   /// Time limit for a smooth frame.
   ///
@@ -482,6 +490,9 @@ class Rasterizer final : public SnapshotDelegate,
       flutter::CompositorContext& compositor_context,
       GrDirectContext* surface_context,
       bool compressed);
+
+  void DrawLayerToSurface(LayerTree* tree,
+                          OffscreenSurface* snapshot_surface) override;
 
   sk_sp<SkImage> DoMakeRasterSnapshot(
       SkISize size,

@@ -5686,6 +5686,36 @@ class ImageDescriptor extends NativeFieldWrapperClass1 {
   void _instantiateCodec(Codec outCodec, int targetWidth, int targetHeight) native 'ImageDescriptor_instantiateCodec';
 }
 
+
+class RenderSurface extends NativeFieldWrapperClass1 {
+  RenderSurface._(int texture) {
+    constructor(texture);
+  }
+
+  static Future<RenderSurface> fromTextureId(int textureId, int width, int height) {
+    final RenderSurface renderSurface = RenderSurface._(textureId);
+    final Completer<RenderSurface> completer = Completer<RenderSurface>.sync();
+    renderSurface.setup(width, height, () {
+      completer.complete(renderSurface);
+    });
+    return completer.future;
+  }
+
+  void constructor(int texture) native 'RenderSurface_constructor';
+  void setup(int width, int height, void Function() callback) native 'RenderSurface_setup';
+
+  Future<void> dispose() async {
+    final Completer<void> completer = Completer<void>.sync();
+    _dispose(() {
+      completer.complete();
+    });
+    return completer.future;
+  }
+  void _dispose(void Function() callback) native 'RenderSurface_dispose';
+
+  int rawTexture() native 'RenderSurface_raw_texture';
+}
+
 /// Generic callback signature, used by [_futurize].
 typedef _Callback<T> = void Function(T result);
 

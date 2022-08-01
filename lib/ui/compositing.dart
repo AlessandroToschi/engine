@@ -6,6 +6,11 @@
 // @dart = 2.12
 part of dart.ui;
 
+@pragma('vm:entry-point')
+class RendererBackgroundException {
+
+}
+
 /// An opaque object representing a composited scene.
 ///
 /// To create a Scene object, use a [SceneBuilder].
@@ -43,15 +48,19 @@ class Scene extends NativeFieldWrapperClass1 {
 
   Future<void> renderToSurface(int width, int height, RenderSurface renderSurface) {
     final Completer<void> completer = Completer<void>.sync();
-    _renderToSurface(width, height, renderSurface, () {
-      completer.complete();
+    _renderToSurface(width, height, renderSurface, (bool success) {
+      if (!success) {
+        completer.completeError(RendererBackgroundException());
+      } else {
+        completer.complete();
+      }
     });
     return completer.future;
   }
 
   String? _toImage(int width, int height, _Callback<_Image?> callback) native 'Scene_toImage';
 
-  void _renderToSurface(int width, int height, RenderSurface renderSurface, void Function() callback) native 'Scene_renderToSurface';
+  void _renderToSurface(int width, int height, RenderSurface renderSurface, void Function(bool success) callback) native 'Scene_renderToSurface';
 
   /// Releases the resources used by this scene.
   ///

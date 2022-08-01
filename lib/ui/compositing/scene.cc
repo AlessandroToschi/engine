@@ -98,24 +98,26 @@ void Scene::renderToSurface(int32_t width,
       std::make_unique<tonic::DartPersistentValue>(dart_state, callback);
   const auto snapshot_delegate = dart_state->GetSnapshotDelegate();
 
-  const auto ui_task = fml::MakeCopyable(
-      [persistent_callback = std::move(persistent_callback)]() mutable {
+  const auto ui_task =
+      fml::MakeCopyable([persistent_callback = std::move(persistent_callback)](
+                            bool success) mutable {
         auto dart_state = persistent_callback->dart_state().lock();
         if (!dart_state) {
           return;
         }
         tonic::DartState::Scope scope(dart_state);
-        tonic::DartInvoke(persistent_callback->Get(), {});
+        tonic::DartInvoke(persistent_callback->Get(), {tonic::ToDart(success)});
         persistent_callback.reset();
       });
 
   const auto raster_task = fml::MakeCopyable(
       [ui_task = std::move(ui_task), ui_task_runner = std::move(ui_task_runner),
        this, render_surface, snapshot_delegate]() {
-        snapshot_delegate->DrawLayerToSurface(
+        const auto success = snapshot_delegate->DrawLayerToSurface(
             layer_tree_.get(), render_surface->get_offscreen_surface());
-        fml::TaskRunner::RunNowOrPostTask(std::move(ui_task_runner),
-                                          std::move(ui_task));
+        fml::TaskRunner::RunNowOrPostTask(
+            std::move(ui_task_runner),
+            [ui_task = std::move(ui_task), success] { ui_task(success); });
       });
 
   fml::TaskRunner::RunNowOrPostTask(std::move(raster_task_runner),

@@ -478,6 +478,9 @@ sk_sp<SkImage> Rasterizer::ConvertToRasterImage(sk_sp<SkImage> image) {
 
 sk_sp<SkImage> Rasterizer::UploadTexture(
     std::shared_ptr<TextureDescriptor>& descriptor) {
+  if (!surface_ || !surface_->GetContext()) {
+    return nullptr;
+  }
   auto _backendTexture = new GrBackendTexture(descriptor->backendTexure());
   return SkImage::MakePromiseTexture(
       surface_->GetContext()->threadSafeProxy(),
@@ -775,8 +778,12 @@ RasterStatus Rasterizer::DrawToSurfaceUnsafe(
   return RasterStatus::kFailed;
 }
 
-void Rasterizer::DrawLayerToSurface(flutter::LayerTree* tree,
+bool Rasterizer::DrawLayerToSurface(flutter::LayerTree* tree,
                                     OffscreenSurface* snapshot_surface) {
+  if (snapshot_surface == nullptr || surface_ == nullptr ||
+      surface_->GetContext() == nullptr) {
+    return false;
+  }
   // Draw the current layer tree into the snapshot surface.
   auto* canvas = snapshot_surface->GetCanvas();
 
@@ -804,6 +811,7 @@ void Rasterizer::DrawLayerToSurface(flutter::LayerTree* tree,
   canvas->clear(SK_ColorTRANSPARENT);
   frame->Raster(*tree, false, nullptr);
   canvas->flush();
+  return true;
 }
 
 static sk_sp<SkData> ScreenshotLayerTreeAsPicture(

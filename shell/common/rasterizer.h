@@ -491,7 +491,7 @@ class Rasterizer final : public SnapshotDelegate,
       GrDirectContext* surface_context,
       bool compressed);
 
-  void DrawLayerToSurface(LayerTree* tree,
+  bool DrawLayerToSurface(LayerTree* tree,
                           OffscreenSurface* snapshot_surface) override;
 
   sk_sp<SkImage> DoMakeRasterSnapshot(

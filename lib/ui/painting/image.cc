@@ -117,10 +117,15 @@ void CanvasImage::FromTextures(Dart_NativeArguments args) {
     auto raw_texture_descriptor = tonic::Int64List(dart_texture_descriptor);
     auto texture_descriptor = TextureDescriptor::Init(raw_texture_descriptor);
     auto _image = snapshot_delegate->UploadTexture(texture_descriptor);
-    auto gpu_image = SkiaGPUObject{std::move(_image), unref_queue};
-    auto dart_image = CanvasImage::Create();
-    dart_image->set_image(DlImageGPU::Make(std::move(gpu_image)));
-    images.push_back(dart_image);
+
+    if (_image != nullptr) {
+      auto dart_image = CanvasImage::Create();
+      auto gpu_image = SkiaGPUObject{std::move(_image), unref_queue};
+      dart_image->set_image(DlImageGPU::Make(std::move(gpu_image)));
+      images.push_back(dart_image);
+    } else {
+      break;
+    }
   }
   Dart_SetReturnValue(args, tonic::ToDart(images));
 }

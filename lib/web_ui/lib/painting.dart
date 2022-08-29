@@ -419,6 +419,12 @@ class RenderSurface {
     engine.canvasKit.ReadSurfacePixels(surface!, buffer.asUint8List(), surface!.width(), surface!.height());
   }
 
+  Image updateTexture(Object src) {
+    print('$surface $src');
+    engine.canvasKit.UpdateSurfaceTexture(surface!, src, surface!.width(), surface!.height());
+    return engine.CkImage(surface!.makeImageSnapshot());
+  }
+
   Future<void> setup(int width, int height) async {
     surface = engine.canvasKit.MakeRenderTargetNc(width, height);
   }

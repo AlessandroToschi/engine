@@ -139,6 +139,7 @@ class CanvasKit {
 
   external SkSurface? MakeRenderTargetNc(int width, int height);
   external Uint8List ReadSurfacePixels(SkSurface surface, Uint8List pixels, int width, int height);
+  external void UpdateSurfaceTexture(SkSurface surface, Object texture, int width, int height);
   external void setCurrentContext(int glContext);
 
   external SkSurface? MakeSurfaceFromTextureSource(

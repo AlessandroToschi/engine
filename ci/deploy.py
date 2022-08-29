@@ -7,6 +7,8 @@ import zipfile
 import shutil
 import glob
 import subprocess
+from sys import platform
+
 
 
 def make_path(*components):
@@ -142,14 +144,107 @@ def build_host():
   # build host_release
   build("host_release")
 
-  flutter_embedder_framework = path.join(
-    HOST_DEBUG,
-    "FlutterEmbedder.framework"
-  )
+  if platform == "darwin":
+    flutter_embedder_framework = path.join(
+      HOST_DEBUG,
+      "FlutterEmbedder.framework"
+    )
+    zip(
+      path.join(DEPLOY_PATH, "FlutterEmbedder.framework.zip"),
+      directories = [
+        flutter_embedder_framework
+      ]
+    )
+
+  if platform == "linux":
+    os.mkdir(make_path(DEPLOY_PATH, 'linux-x64'))
+    zip(
+      make_path(DEPLOY_PATH, "dart-sdk-linux-x64.zip"),
+      directories=[
+          make_path(HOST_DEBUG, "dart-sdk")
+      ]
+    )
+
+    zip(
+      make_path(DEPLOY_PATH, "linux-x64", "linux-x64-flutter-gtk.zip"),
+      files = [
+        make_path("out", HOST_DEBUG, "gen_snapshot"),
+        make_path("out", HOST_DEBUG, "libflutter_linux_gtk.so")
+      ],
+      directories = [
+        make_path("out", HOST_DEBUG, "flutter_linux")
+      ]
+    )
+
+    for mode in ["debug", "profile", "release"]:
+      folder = make_path(DEPLOY_PATH, "linux-x64-{}".format(mode))
+      os.mkdir(folder)
+      zip(
+        make_path(folder, "linux-x64-flutter-gtk.zip"),
+        files = [
+          make_path("out", HOST_DEBUG, "gen_snapshot"),
+          make_path("out", HOST_DEBUG, "libflutter_linux_gtk.so")
+        ],
+        directories = [
+          make_path("out", HOST_DEBUG, "flutter_linux")
+        ]
+      )
+
+      # No releases this year we can probably skip
+      # zip(
+      #   make_path(folder, "linux-x64-flutter-glfw.zip"),
+      #   files = [
+      #     make_path("out", HOST_DEBUG, "gen_snapshot"),
+      #     make_path("out", HOST_DEBUG, "libflutter_linux_gtk.so")
+      #   ],
+      #   directories = [
+      #     make_path("out", HOST_DEBUG, "flutter_linux")
+      #   ]
+      # )
+
+    
+    print("Creating linux64 artifacts")
+    zip(
+      make_path(DEPLOY_PATH, "linux-x64", "artifacts.zip"),
+      files = [
+        ICU_DATA_PATH,
+        path.join(HOST_DEBUG, "flutter_tester"),
+        #path.join(HOST_DEBUG, "impellerc"),
+        path.join(HOST_DEBUG, "gen", "flutter", "lib", "snapshot", "isolate_snapshot.bin"),
+        path.join(HOST_DEBUG, "gen", "flutter", "lib", "snapshot", "vm_isolate_snapshot.bin"),
+        path.join(HOST_DEBUG, "gen", "frontend_server.dart.snapshot"),
+        #path.join(HOST_DEBUG, "gen_snapshot")
+      ]
+    )
+
+    print("Creating linux-x64 font-subset.zip")
+    shutil.copy(
+      make_path(HOST_RELEASE, "zip_archives", "linux-x64", "font-subset.zip"),
+      make_path(DEPLOY_PATH, "linux-x64", "font-subset.zip")
+    )
+
+    print(f"Creating linux-x64 linux-x64-embedder.zip")
+    zip(
+      make_path(DEPLOY_PATH, "linux-x64", "linux-x64-embedder.zip"),
+      files = [
+          make_path("out", HOST_DEBUG, "flutter_embedder.h"),
+          make_path("out", HOST_DEBUG, "libflutter_engine.so")
+      ]
+    )
+
+    print("Creating flutter-web-sdk-linux-x64.zip")
+    zip(
+      make_path(DEPLOY_PATH, "flutter-web-sdk-linux-x64.zip"),
+      directories=[
+          make_path(HOST_DEBUG, "flutter_web_sdk")
+      ]
+    )
+
+  print("Creating sky_engine.zip")
   zip(
-    path.join(DEPLOY_PATH, "FlutterEmbedder.framework.zip"),
-    directories = [
-      flutter_embedder_framework
+    make_path(DEPLOY_PATH, "sky_engine.zip"),
+    directories=[
+        make_path(HOST_DEBUG, "gen", "dart-pkg", "sky_engine")
     ]
   )
 
@@ -663,7 +758,6 @@ def package_ios_variant(
       ]
     )
 
-
 def build_ios():
   # ios_debug_sim
   gn([
@@ -774,10 +868,13 @@ def main():
   check_cwd()
   clean_deploy_directory()
   set_use_prebuild_dart_sdk(True)
+
   build_host()
-  build_mac()
-  build_android()
-  build_ios()
+  if (platform == "darwin"):
+    build_mac()
+    build_ios()
+  
+  #build_android()
   set_use_prebuild_dart_sdk(False)
 
 

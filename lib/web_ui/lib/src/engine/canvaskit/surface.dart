@@ -120,8 +120,6 @@ class Surface {
   SurfaceFrame acquireFrame(ui.Size size) {
     final CkSurface surface = createOrUpdateSurface(size);
 
-    canvasKit.setCurrentContext(_glContext!);
-
     // ignore: prefer_function_declarations_over_variables
     final SubmitCallback submitCallback =
         (SurfaceFrame surfaceFrame, CkCanvas canvas) {

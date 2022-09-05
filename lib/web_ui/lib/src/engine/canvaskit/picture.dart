@@ -10,6 +10,7 @@ import 'canvas.dart';
 import 'canvaskit_api.dart';
 import 'image.dart';
 import 'skia_object_cache.dart';
+import 'surface_factory.dart';
 
 /// Implements [ui.Picture] on top of [SkPicture].
 ///
@@ -112,7 +113,13 @@ class CkPicture extends ManagedSkiaObject<SkPicture> implements ui.Picture {
   @override
   Future<ui.Image> toImage(int width, int height) async {
     assert(debugCheckNotDisposed('Cannot convert picture to image.'));
-    SkSurface? skSurface = canvasKit.MakeRenderTargetNc(width, height);
+
+    final SkGrContext? grContext = SurfaceFactory.instance.baseSurface.grContext;
+    SkSurface? skSurface;
+    if (grContext != null) {
+      skSurface = canvasKit.MakeRenderTarget(grContext, width, height);
+    }
+    
     if (skSurface == null) {
       skSurface = canvasKit.MakeSurface(width, height);
       print('Failed to create GPU backed surface, using software surface as fallback');

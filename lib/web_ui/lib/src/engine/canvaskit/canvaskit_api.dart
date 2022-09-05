@@ -137,9 +137,9 @@ class CanvasKit {
   );
   external SkSurface MakeSWCanvasSurface(html.CanvasElement canvas);
 
-  external SkSurface? MakeRenderTargetNc(int width, int height);
+  external SkSurface? MakeRenderTarget(SkGrContext grContext, int width, int height);
   external Uint8List ReadSurfacePixels(SkSurface surface, Uint8List pixels, int width, int height);
-  external void UpdateSurfaceTexture(SkSurface surface, Object texture, int width, int height);
+  external void UpdateSurfaceTexture(SkGrContext grContext, SkSurface surface, Object texture, int width, int height);
   external void setCurrentContext(int glContext);
 
   external SkSurface? MakeSurfaceFromTextureSource(

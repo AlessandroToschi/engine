@@ -420,13 +420,23 @@ class RenderSurface {
   }
 
   Image updateTexture(Object src) {
-    print('$surface $src');
-    engine.canvasKit.UpdateSurfaceTexture(surface!, src, surface!.width(), surface!.height());
+    final engine.SkGrContext? grContext = engine.SurfaceFactory.instance.baseSurface.grContext;
+    if (grContext == null) {
+      throw Exception('No gr context when updating rendersurface');
+    }
+    engine.canvasKit.UpdateSurfaceTexture(grContext, surface!, src, surface!.width(), surface!.height());
     return engine.CkImage(surface!.makeImageSnapshot());
   }
 
   Future<void> setup(int width, int height) async {
-    surface = engine.canvasKit.MakeRenderTargetNc(width, height);
+    final engine.SkGrContext? grContext = engine.SurfaceFactory.instance.baseSurface.grContext;
+    if (grContext == null) {
+      throw Exception('No gr context when creating rendersurface');
+    }
+    surface = engine.canvasKit.MakeRenderTarget(grContext, width, height);
+    if (surface == null) {
+      throw Exception('Failed to create render surface');
+    }
   }
 
   Future<void> dispose() async {

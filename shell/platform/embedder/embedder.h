@@ -8,7 +8,7 @@
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
-
+#include <functional>
 // This file defines an Application Binary Interface (ABI), which requires more
 // stability than regular code to remain functional for exchanging messages
 // between different versions of the embedding and the engine, to allow for both
@@ -2232,6 +2232,11 @@ FlutterEngineResult FlutterEnginePostRenderThreadTask(
     VoidCallback callback,
     void* callback_data);
 
+FLUTTER_EXPORT
+FlutterEngineResult FlutterEnginePostRenderThreadFunction(
+    FLUTTER_API_SYMBOL(FlutterEngine) engine,
+    std::function<void()> function);
+
 //------------------------------------------------------------------------------
 /// @brief      Get the current time in nanoseconds from the clock used by the
 ///             flutter engine. This is the system monotonic clock.
@@ -2507,6 +2512,9 @@ typedef FlutterEngineResult (*FlutterEnginePostRenderThreadTaskFnPtr)(
     FLUTTER_API_SYMBOL(FlutterEngine) engine,
     VoidCallback callback,
     void* callback_data);
+typedef FlutterEngineResult (*FlutterEnginePostRenderThreadFunctionFnPtr)(
+    FLUTTER_API_SYMBOL(FlutterEngine) engine,
+    std::function<void()>);
 typedef uint64_t (*FlutterEngineGetCurrentTimeFnPtr)();
 typedef FlutterEngineResult (*FlutterEngineRunTaskFnPtr)(
     FLUTTER_API_SYMBOL(FlutterEngine) engine,
@@ -2538,7 +2546,7 @@ typedef FlutterEngineResult (*FlutterEngineScheduleFrameFnPtr)(
 typedef struct {
   /// The size of this struct. Must be sizeof(FlutterEngineProcs).
   size_t struct_size;
-
+  
   FlutterEngineCreateAOTDataFnPtr CreateAOTData;
   FlutterEngineCollectAOTDataFnPtr CollectAOTData;
   FlutterEngineRunFnPtr Run;
@@ -2578,6 +2586,7 @@ typedef struct {
       PostCallbackOnAllNativeThreads;
   FlutterEngineNotifyDisplayUpdateFnPtr NotifyDisplayUpdate;
   FlutterEngineScheduleFrameFnPtr ScheduleFrame;
+
 } FlutterEngineProcTable;
 
 //------------------------------------------------------------------------------

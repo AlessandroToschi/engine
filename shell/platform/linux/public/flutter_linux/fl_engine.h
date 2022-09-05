@@ -10,10 +10,12 @@
 #endif
 
 #include <glib-object.h>
+#include <functional>
 
 #include "fl_binary_messenger.h"
 #include "fl_dart_project.h"
 #include "fl_texture_registrar.h"
+typedef void (*VoidCallback)(void* /* user data */);
 
 G_BEGIN_DECLS
 
@@ -54,6 +56,9 @@ FlBinaryMessenger* fl_engine_get_binary_messenger(FlEngine* engine);
  * Returns: an #FlTextureRegistrar.
  */
 FlTextureRegistrar* fl_engine_get_texture_registrar(FlEngine* engine);
+
+
+void fl_engine_run_task_on_raster_thread(FlEngine* self, VoidCallback callback, void* userdata);
 
 G_END_DECLS
 

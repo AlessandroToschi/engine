@@ -7,6 +7,8 @@
 #include <gmodule.h>
 
 #include <cstring>
+#include <functional>
+#include <iostream>
 
 #include "flutter/shell/platform/embedder/embedder.h"
 #include "flutter/shell/platform/linux/fl_binary_messenger_private.h"
@@ -806,4 +808,13 @@ G_MODULE_EXPORT FlTextureRegistrar* fl_engine_get_texture_registrar(
     FlEngine* self) {
   g_return_val_if_fail(FL_IS_ENGINE(self), nullptr);
   return self->texture_registrar;
+}
+
+G_MODULE_EXPORT void fl_engine_run_task_on_raster_thread(
+    FlEngine* self, VoidCallback callback, void* userdata) {
+  
+  self->embedder_api.PostRenderThreadTask(
+    self->engine,
+    callback, 
+    userdata);
 }

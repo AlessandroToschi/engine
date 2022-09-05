@@ -24,6 +24,7 @@ class RenderSurface : public RefCountedDartWrappable<RenderSurface> {
   void setup(int32_t width, int32_t height, Dart_Handle callback);
 
   int64_t raw_texture();
+  int64_t raw_framebuffer();
 
   void dispose(Dart_Handle callback);
 

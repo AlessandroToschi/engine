@@ -5715,7 +5715,9 @@ class RenderSurface extends NativeFieldWrapperClass1 {
     constructor(texture as int);
   }
 
-  void toBytes(ByteBuffer buffer) {}
+  void toBytes(ByteBuffer buffer) {
+    throw UnimplementedError();
+  }
 
   static Future<RenderSurface> fromTextureId(int textureId, int width, int height) {
     final RenderSurface renderSurface = RenderSurface._(textureId);
@@ -5725,6 +5727,8 @@ class RenderSurface extends NativeFieldWrapperClass1 {
     });
     return completer.future;
   }
+
+  
 
   void constructor(int texture) native 'RenderSurface_constructor';
   void setup(int width, int height, void Function() callback) native 'RenderSurface_setup';
@@ -5738,6 +5742,7 @@ class RenderSurface extends NativeFieldWrapperClass1 {
   }
   void _dispose(void Function() callback) native 'RenderSurface_dispose';
 
+  int rawFramebuffer() native 'RenderSurface_raw_framebuffer';
   int rawTexture() native 'RenderSurface_raw_texture';
 }
 

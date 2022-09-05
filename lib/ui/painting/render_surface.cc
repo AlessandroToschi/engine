@@ -23,6 +23,7 @@ IMPLEMENT_WRAPPERTYPEINFO(ui, RenderSurface);
 #define FOR_EACH_BINDING(V)     \
   V(RenderSurface, setup)       \
   V(RenderSurface, raw_texture) \
+  V(RenderSurface, raw_framebuffer) \
   V(RenderSurface, dispose)
 
 FOR_EACH_BINDING(DART_NATIVE_CALLBACK)
@@ -76,7 +77,12 @@ int64_t RenderSurface::raw_texture() {
   return _raw_texture;
 }
 
+int64_t RenderSurface::raw_framebuffer() {
+  return _raw_texture;
+}
+
 OffscreenSurface* RenderSurface::get_offscreen_surface() {
+  
   return _surface.get();
 }
 

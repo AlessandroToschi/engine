@@ -11,6 +11,7 @@
 #include <set>
 #include <string>
 #include <vector>
+#include <functional>
 
 #include "flutter/fml/build_config.h"
 #include "flutter/fml/closure.h"
@@ -2214,6 +2215,16 @@ void FlutterEngineTraceEventInstant(const char* name) {
   fml::tracing::TraceEventInstant0("flutter", name);
 }
 
+FlutterEngineResult FlutterEnginePostRenderThreadFunction(
+    FLUTTER_API_SYMBOL(FlutterEngine) engine,
+    std::function<void()> function) {
+    return reinterpret_cast<flutter::EmbedderEngine*>(engine)
+                 ->PostRenderThreadTask(function)
+            ? kSuccess
+            : LOG_EMBEDDER_ERROR(kInternalInconsistency,
+                                  "Could not post the render thread task.");
+}
+
 FlutterEngineResult FlutterEnginePostRenderThreadTask(
     FLUTTER_API_SYMBOL(FlutterEngine) engine,
     VoidCallback callback,
@@ -2629,6 +2640,7 @@ FlutterEngineResult FlutterEngineGetProcAddresses(
   SET_PROC(TraceEventDurationEnd, FlutterEngineTraceEventDurationEnd);
   SET_PROC(TraceEventInstant, FlutterEngineTraceEventInstant);
   SET_PROC(PostRenderThreadTask, FlutterEnginePostRenderThreadTask);
+  SET_PROC(PostRenderThreadFunction, FlutterEnginePostRenderThreadFunction);
   SET_PROC(GetCurrentTime, FlutterEngineGetCurrentTime);
   SET_PROC(RunTask, FlutterEngineRunTask);
   SET_PROC(UpdateLocales, FlutterEngineUpdateLocales);
@@ -2639,7 +2651,9 @@ FlutterEngineResult FlutterEngineGetProcAddresses(
            FlutterEnginePostCallbackOnAllNativeThreads);
   SET_PROC(NotifyDisplayUpdate, FlutterEngineNotifyDisplayUpdate);
   SET_PROC(ScheduleFrame, FlutterEngineScheduleFrame);
-#undef SET_PROC
+
+  // clay stuff
+  #undef SET_PROC
 
   return kSuccess;
 }

@@ -7,6 +7,7 @@
 
 #include "flutter/flow/layers/container_layer.h"
 
+
 namespace flutter {
 
 // Don't add an OpacityLayer with no children to the layer tree. Painting an
@@ -25,7 +26,9 @@ class OpacityLayer : public MergedContainerLayer {
   // the retained rendering inefficient as a small offset change could propagate
   // to many leaf layers. Therefore we try to capture that offset here to stop
   // the propagation as repainting the OpacityLayer is expensive.
+  OpacityLayer(SkAlpha alpha, const SkPoint& offset, const SkBlendMode& blendMode);
   OpacityLayer(SkAlpha alpha, const SkPoint& offset);
+
 
   void Diff(DiffContext* context, const Layer* old_layer) override;
 
@@ -37,7 +40,7 @@ class OpacityLayer : public MergedContainerLayer {
   // and modifying their rendering accordingly. This value is only guaranteed
   // to be valid after the local |Preroll| method is called.
   bool children_can_accept_opacity() const {
-    return children_can_accept_opacity_;
+    return children_can_accept_opacity_ && blend_mode_ == SkBlendMode::kSrcOver;
   }
   void set_children_can_accept_opacity(bool value) {
     children_can_accept_opacity_ = value;
@@ -48,6 +51,7 @@ class OpacityLayer : public MergedContainerLayer {
  private:
   SkAlpha alpha_;
   SkPoint offset_;
+  SkBlendMode blend_mode_;
   bool children_can_accept_opacity_;
 
   FML_DISALLOW_COPY_AND_ASSIGN(OpacityLayer);

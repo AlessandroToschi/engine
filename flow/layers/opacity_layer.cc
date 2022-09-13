@@ -9,8 +9,11 @@
 
 namespace flutter {
 
-OpacityLayer::OpacityLayer(SkAlpha alpha, const SkPoint& offset)
-    : alpha_(alpha), offset_(offset), children_can_accept_opacity_(false) {
+OpacityLayer::OpacityLayer(SkAlpha alpha, const SkPoint& offset) : 
+  OpacityLayer(alpha, offset, SkBlendMode::kSrcOver) { }
+
+OpacityLayer::OpacityLayer(SkAlpha alpha, const SkPoint& offset, const SkBlendMode& blend_mode)
+    : alpha_(alpha), offset_(offset), blend_mode_(blend_mode), children_can_accept_opacity_(false) {
   // We can always inhert opacity even if we cannot pass it along to
   // our children as we can accumulate the inherited opacity into our
   // own opacity value before we recurse.
@@ -22,7 +25,7 @@ void OpacityLayer::Diff(DiffContext* context, const Layer* old_layer) {
   auto* prev = static_cast<const OpacityLayer*>(old_layer);
   if (!context->IsSubtreeDirty()) {
     FML_DCHECK(prev);
-    if (alpha_ != prev->alpha_ || offset_ != prev->offset_) {
+    if (alpha_ != prev->alpha_ || offset_ != prev->offset_ || blend_mode_ != prev->blend_mode_) {
       context->MarkSubtreeDirty(context->GetOldLayerPaintRegion(old_layer));
     }
   }
@@ -37,7 +40,11 @@ void OpacityLayer::Diff(DiffContext* context, const Layer* old_layer) {
 
 void OpacityLayer::Preroll(PrerollContext* context, const SkMatrix& matrix) {
   TRACE_EVENT0("flutter", "OpacityLayer::Preroll");
-  FML_DCHECK(!GetChildContainer()->layers().empty());  // We can't be a leaf.
+  FML_LOG(ERROR) << "Preroll alpha: " << +alpha_ << " children: " << GetChildContainer()->layers().size(); 
+  // FML_DCHECK(!GetChildContainer()->layers().empty());  // We can't be a leaf.
+  if (GetChildContainer()->layers().empty()) {
+    return;
+  }
 
   SkMatrix child_matrix = matrix;
   child_matrix.preTranslate(offset_.fX, offset_.fY);
@@ -94,6 +101,8 @@ void OpacityLayer::Paint(PaintContext& context) const {
 
   SkPaint paint;
   paint.setAlphaf(subtree_opacity);
+  paint.setBlendMode(blend_mode_);
+  FML_LOG(ERROR) << "The blend mode is: " << static_cast<int>(blend_mode_);
 
   if (context.raster_cache &&
       context.raster_cache->Draw(GetCacheableChild(),

@@ -1667,7 +1667,7 @@ class Image {
   final int height;
 
   static List<Image?> fromTextures(List<TextureDescriptor> textureDescriptors) {
-    final List<Image?> images = _Image.fromTextures(textureDescriptors.map((TextureDescriptor e) => e._rawValues).toList(growable: false)).map((_Image?_image) => _image != null ? Image._(_image) : null).toList(growable: false);
+    final List<Image?> images = _Image.fromTextures(textureDescriptors.map((TextureDescriptor e) => e._rawValues).toList(growable: false)).map((_Image?_image) => _image != null ? Image._(_image, _image.width, _image.height) : null).toList(growable: false);
     final int inLength = textureDescriptors.length;
     final int outLength = images.length;
     if (inLength != outLength) {

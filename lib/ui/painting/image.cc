@@ -20,15 +20,15 @@ inline Dart_Handle LookupNullableType(const std::string& library_name,
                                       const std::string& type_name) {
   auto library =
       Dart_LookupLibrary(DartConverter<std::string>::ToDart(library_name));
-  if (LogIfError(library)) {
+  if (CheckAndHandleError(library)) {
     return library;
   }
   auto type_string = DartConverter<std::string>::ToDart(type_name);
-  if (LogIfError(type_string)) {
+  if (CheckAndHandleError(type_string)) {
     return type_string;
   }
   auto type = Dart_GetNullableType(library, type_string, 0, nullptr);
-  if (LogIfError(type)) {
+  if (CheckAndHandleError(type)) {
     return type;
   }
   return type;

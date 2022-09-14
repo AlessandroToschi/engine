@@ -46,13 +46,16 @@ AndroidTextureDescriptor::AndroidTextureDescriptor(
     : TextureDescriptor(raw_values) {}
 
 GrBackendTexture AndroidTextureDescriptor::backendTexure() const {
+
 #ifdef SK_GL
-  // GL_TEXTURE_EXTERNAL_OES 0x8D65
-  // GL_TEXTURE_2D 0x0DE1
-  // GL_RGBA8_OES 0x8058
-  // GL_RGBA8 0x8058
+uint32_t format = 0x8058; // GL_RGBA8 0x8058_(OES)
+#if defined(FML_OS_ANDROID)
+  uint32_t target = 0x8D65; // GL_TEXTURE_EXTERNAL_OES
+#else 
+  uint32_t target = 0x0DE1; // GL_TEXTURE_2D
+#endif
   const GrGLTextureInfo texture_info{
-      0x8D65, static_cast<GrGLuint>(raw_texture_), 0x8058};
+      target, static_cast<GrGLuint>(raw_texture_), format};
 #else
   const GrMockTextureInfo texture_info;
 #endif

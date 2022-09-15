@@ -17,6 +17,7 @@ namespace flutter {
 // |Preroll| will assert if there are no children.
 class OpacityLayer : public CacheableContainerLayer {
  public:
+  OpacityLayer(SkAlpha alpha, const SkPoint& offset, SkBlendMode blend_mode);
   // An offset is provided here because OpacityLayer.addToScene method in the
   // Flutter framework can take an optional offset argument.
   //
@@ -28,7 +29,6 @@ class OpacityLayer : public CacheableContainerLayer {
   // to many leaf layers. Therefore we try to capture that offset here to stop
   // the propagation as repainting the OpacityLayer is expensive.
   OpacityLayer(SkAlpha alpha, const SkPoint& offset);
-  OpacityLayer(SkAlpha alpha, const SkPoint& offset, SkBlendMode blend_mode);
 
   void Diff(DiffContext* context, const Layer* old_layer) override;
 

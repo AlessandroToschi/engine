@@ -17,7 +17,7 @@ OpacityLayer::OpacityLayer(SkAlpha alpha, const SkPoint& offset)
 
 OpacityLayer::OpacityLayer(SkAlpha alpha,
                            const SkPoint& offset,
-                           const SkBlendMode& blend_mode)
+                           SkBlendMode blend_mode)
     : CacheableContainerLayer(std::numeric_limits<int>::max(), true),
       alpha_(alpha),
       offset_(offset),

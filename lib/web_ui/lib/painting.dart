@@ -373,7 +373,7 @@ class RenderSurface extends engine.ManagedSkiaObject<engine.SkSurface> {
   @override
   bool get isResurrectionExpensive => true;
 
-  void toBytes(ByteBuffer buffer) { 
+  void toBytes(ByteBuffer buffer) {
     if (rawSkiaObject == null) {
       print('Error: No surface available when doing read.'); // Exceptions are weird from dart2js, print aswell
       throw Exception('Failed to create GPU-backed SkSurface for RenderSurface');

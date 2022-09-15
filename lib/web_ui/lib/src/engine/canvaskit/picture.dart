@@ -102,7 +102,7 @@ class CkPicture extends ManagedSkiaObject<SkPicture> implements ui.Picture {
       skSurface = canvasKit.MakeRenderTarget(grContext, width, height);
       isGpuBacked = skSurface != null;
     }
-    
+
     if (skSurface == null) {
       skSurface = canvasKit.MakeSurface(width, height);
       print('Failed to create GPU backed surface, using software surface as fallback');

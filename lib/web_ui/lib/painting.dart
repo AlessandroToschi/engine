@@ -373,7 +373,13 @@ class RenderSurface extends engine.ManagedSkiaObject<engine.SkSurface> {
   @override
   bool get isResurrectionExpensive => true;
 
-  void toBytes(ByteBuffer buffer) { }
+  void toBytes(ByteBuffer buffer) { 
+    if (rawSkiaObject == null) {
+      print('Error: No surface available when doing read.'); // Exceptions are weird from dart2js, print aswell
+      throw Exception('Failed to create GPU-backed SkSurface for RenderSurface');
+    }
+    rawSkiaObject!.readPixelsGL(buffer.asUint8List());
+  }
 
   engine.SkSurface setup(int width, int height) {
     final engine.SkGrContext? grContext = engine.SurfaceFactory.instance.baseSurface.grContext;
@@ -397,14 +403,6 @@ class RenderSurface extends engine.ManagedSkiaObject<engine.SkSurface> {
 
     rawSkiaObject!.updateFromSource(src, width, height, false);
     return engine.CkImage(rawSkiaObject!.makeImageSnapshot());
-  }
-
-  void updateTextureFromSource(Object src, Image img) {
-    if (rawSkiaObject == null) {
-      throw Exception("RenderSurface's SkiaSurface is not ready when updating from source.");
-    }
-    final engine.CkImage ckImage = img as engine.CkImage;
-    rawSkiaObject!.updateTextureFromSource(ckImage.skImage, src);
   }
 
   Future<void> dispose() async {

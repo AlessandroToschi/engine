@@ -227,6 +227,7 @@ extension SkSurfaceExtension on SkSurface {
   external SkImage makeImageSnapshot();
   external void updateFromSource(Object src, int width, int height, bool srcIsPremul);
   external SkImage? makeImageFromTextureSource(Object src, SkImageInfo? info, bool srcIsPremul);
+  external void readPixelsGL(Uint8List buffer);
   external void delete();
 }
 

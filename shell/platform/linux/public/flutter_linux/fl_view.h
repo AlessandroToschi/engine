@@ -56,6 +56,7 @@ FlView* fl_view_new(FlDartProject* project);
  */
 FlEngine* fl_view_get_engine(FlView* view);
 
+gboolean fl_view_make_render_context_current(FlView* view);
 G_END_DECLS
 
 #endif  // FLUTTER_SHELL_PLATFORM_LINUX_FL_VIEW_H_

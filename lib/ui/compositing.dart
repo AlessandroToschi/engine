@@ -172,6 +172,16 @@ class OpacityEngineLayer extends _EngineLayerWrapper {
   OpacityEngineLayer._(EngineLayer nativeLayer) : super._(nativeLayer);
 }
 
+
+/// An opaque handle to a blend engine layer.
+///
+/// Instances of this class are created by [SceneBuilder.pushBlend].
+///
+/// {@macro dart.ui.sceneBuilder.oldLayerCompatibility}
+class BlendEngineLayer extends _EngineLayerWrapper {
+  BlendEngineLayer._(EngineLayer nativeLayer) : super._(nativeLayer);
+}
+
 /// An opaque handle to a color filter engine layer.
 ///
 /// Instances of this class are created by [SceneBuilder.pushColorFilter].
@@ -466,6 +476,25 @@ class SceneBuilder extends NativeFieldWrapperClass1 {
 
   void _pushOpacity(EngineLayer layer, int alpha, double dx, double dy, EngineLayer? oldLayer)
       native 'SceneBuilder_pushOpacity';
+
+  /// Pushes a color filter operation onto the operation stack.
+  /// TODO: rest of documentation
+  BlendEngineLayer pushBlend(
+    int alpha,
+    BlendMode blendMode, {
+    Offset? offset = Offset.zero,
+    BlendEngineLayer? oldLayer,
+  }) {
+    assert(_debugCheckCanBeUsedAsOldLayer(oldLayer, 'pushBlend'));
+    final EngineLayer engineLayer = EngineLayer._();
+    _pushBlend(engineLayer, alpha, offset!.dx, offset.dy, blendMode.index, oldLayer?._nativeLayer);
+    final BlendEngineLayer layer = BlendEngineLayer._(engineLayer);
+    assert(_debugPushLayer(layer));
+    return layer;
+  }
+
+  void _pushBlend(EngineLayer layer, int alpha, double dx, double dy, int blendMode, EngineLayer? oldLayer)
+      native 'SceneBuilder_pushBlend';
 
   /// Pushes a color filter operation onto the operation stack.
   ///

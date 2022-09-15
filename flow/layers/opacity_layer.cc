@@ -11,10 +11,17 @@ namespace flutter {
 
 // the opacity_layer couldn't cache itself, so the cache_threshold is the
 // max_int
+
 OpacityLayer::OpacityLayer(SkAlpha alpha, const SkPoint& offset)
+    : OpacityLayer(alpha, offset, SkBlendMode::kSrcOver) {}
+
+OpacityLayer::OpacityLayer(SkAlpha alpha,
+                           const SkPoint& offset,
+                           const SkBlendMode& blend_mode)
     : CacheableContainerLayer(std::numeric_limits<int>::max(), true),
       alpha_(alpha),
       offset_(offset),
+      blend_mode_(blend_mode),
       children_can_accept_opacity_(false) {}
 
 void OpacityLayer::Diff(DiffContext* context, const Layer* old_layer) {
@@ -22,7 +29,8 @@ void OpacityLayer::Diff(DiffContext* context, const Layer* old_layer) {
   auto* prev = static_cast<const OpacityLayer*>(old_layer);
   if (!context->IsSubtreeDirty()) {
     FML_DCHECK(prev);
-    if (alpha_ != prev->alpha_ || offset_ != prev->offset_) {
+    if (alpha_ != prev->alpha_ || offset_ != prev->offset_ ||
+        blend_mode_ != prev->blend_mode_) {
       context->MarkSubtreeDirty(context->GetOldLayerPaintRegion(old_layer));
     }
   }
@@ -33,7 +41,11 @@ void OpacityLayer::Diff(DiffContext* context, const Layer* old_layer) {
 
 void OpacityLayer::Preroll(PrerollContext* context, const SkMatrix& matrix) {
   TRACE_EVENT0("flutter", "OpacityLayer::Preroll");
-  FML_DCHECK(!layers().empty());  // We can't be a leaf.
+  // FML_DCHECK(!layers().empty());  // We can't be a leaf.
+  // TODO: is this valid?
+  if (layers().empty()) {
+    return;
+  }
 
   SkMatrix child_matrix = matrix;
   child_matrix.preTranslate(offset_.fX, offset_.fY);
@@ -98,6 +110,7 @@ void OpacityLayer::Paint(PaintContext& context) const {
 
   SkPaint paint;
   paint.setAlphaf(subtree_opacity);
+  paint.setBlendMode(blend_mode_);
 
   if (layer_raster_cache_item_->Draw(context, &paint)) {
     return;

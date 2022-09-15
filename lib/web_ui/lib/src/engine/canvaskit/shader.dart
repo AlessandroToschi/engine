@@ -54,7 +54,7 @@ class CkRuntimeEffect extends ManagedSkiaObject<SkRuntimeEffect> {
     });
 
     // Append the sizes of each sampler to the uniforms
-    samplerUniforms.asMap().forEach((int index, ui.ImageShader sampler) { 
+    samplerUniforms.asMap().forEach((int index, ui.ImageShader sampler) {
       final CkImageShader ckShader = sampler as CkImageShader;
       floatUniformsWithSamplerSizes[floatUniforms.length + index * 2] = ckShader._image.width.toDouble();
       floatUniformsWithSamplerSizes[floatUniforms.length + index * 2 + 1] = ckShader._image.height.toDouble();

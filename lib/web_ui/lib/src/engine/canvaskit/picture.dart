@@ -127,7 +127,7 @@ class CkPicture extends ManagedSkiaObject<SkPicture> implements ui.Picture {
       rawSkiaObject?.delete();
     }
   }
-  
+
   @override
   Future<void> renderToSurface(int width, int height, ui.RenderSurface renderSurface, [bool? flipVertically]) async {
     if (renderSurface.rawSkiaObject== null) {
@@ -136,12 +136,12 @@ class CkPicture extends ManagedSkiaObject<SkPicture> implements ui.Picture {
 
     final SkCanvas canvas = renderSurface.rawSkiaObject!.getCanvas();
     canvas.save();
-    
+
     if (flipVertically == true) {
       canvas.translate(0, height.toDouble());
       canvas.scale(1, -1);
     }
-   
+
     canvas.drawPicture(rawSkiaObject!);
     canvas.restore();
     renderSurface.rawSkiaObject!.flush();

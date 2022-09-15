@@ -29,7 +29,7 @@ class SurfaceScene implements ui.Scene {
   /// After calling this function, the scene is cannot be used further.
   @override
   void dispose() {}
-  
+
   @override
   Future<void> renderToSurface(int width, int height, ui.RenderSurface renderSurface, [bool? flipVertically]) {
     throw UnimplementedError('renderToSurface is only implemented for CanvasKit backend');

@@ -350,11 +350,11 @@ abstract class Image {
 abstract class TextureDescriptor {
   TextureDescriptor._();
   static TextureDescriptor fromTextureId(int textureId, int width, int height, { PixelFormat pixelFormat = PixelFormat.rgba8888 }) {
-     throw UnimplementedError(); 
+     throw UnimplementedError();
   }
 
   static TextureDescriptor fromTexturePointer(int textureId, int width, int height, { PixelFormat pixelFormat = PixelFormat.bgra8888 }) {
-     throw UnimplementedError(); 
+     throw UnimplementedError();
   }
 }
 
@@ -393,7 +393,7 @@ class RenderSurface extends engine.ManagedSkiaObject<engine.SkSurface> {
   Image makeImageSnapshotFromSource(Object src) {
     if (rawSkiaObject == null) {
       throw Exception("RenderSurface's SkiaSurface is not ready when making image from source.");
-    } 
+    }
 
     rawSkiaObject!.updateFromSource(src, width, height, false);
     return engine.CkImage(rawSkiaObject!.makeImageSnapshot());
@@ -402,8 +402,8 @@ class RenderSurface extends engine.ManagedSkiaObject<engine.SkSurface> {
   void updateTextureFromSource(Object src, Image img) {
     if (rawSkiaObject == null) {
       throw Exception("RenderSurface's SkiaSurface is not ready when updating from source.");
-    } 
-    final engine.CkImage ckImage = img as engine.CkImage; 
+    }
+    final engine.CkImage ckImage = img as engine.CkImage;
     rawSkiaObject!.updateTextureFromSource(ckImage.skImage, src);
   }
 
@@ -414,17 +414,17 @@ class RenderSurface extends engine.ManagedSkiaObject<engine.SkSurface> {
   int rawTexture() {
     throw UnimplementedError();
   }
-  
+
   @override
   engine.SkSurface createDefault() {
     return setup(width, height);
   }
-  
+
   @override
   void delete() {
     rawSkiaObject?.delete();
   }
-  
+
   @override
   engine.SkSurface resurrect() {
     return createDefault();
@@ -927,7 +927,7 @@ class FragmentProgram {
     throw UnsupportedError('FragmentProgram is not supported for the CanvasKit or HTML renderers.');
   }
 
-  FragmentProgram._(String sksl): runtimeEffect = engine.CkRuntimeEffect(sksl); 
+  FragmentProgram._(String sksl): runtimeEffect = engine.CkRuntimeEffect(sksl);
 
   static FragmentProgram setShader({
       required String sksl
@@ -951,6 +951,6 @@ class FragmentProgram {
       throw UnimplementedError('Fragment program is only supported for CanvasKit renderer');
     }
 
-    return runtimeEffect.makeShader(floatUniforms, samplerUniforms);    
+    return runtimeEffect.makeShader(floatUniforms, samplerUniforms);
   }
 }

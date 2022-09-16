@@ -41,11 +41,7 @@ void OpacityLayer::Diff(DiffContext* context, const Layer* old_layer) {
 
 void OpacityLayer::Preroll(PrerollContext* context, const SkMatrix& matrix) {
   TRACE_EVENT0("flutter", "OpacityLayer::Preroll");
-  // FML_DCHECK(!layers().empty());  // We can't be a leaf.
-  // TODO: is this valid?
-  if (layers().empty()) {
-    return;
-  }
+  FML_DCHECK(!layers().empty());  // We can't be a leaf.
 
   SkMatrix child_matrix = matrix;
   child_matrix.preTranslate(offset_.fX, offset_.fY);

@@ -111,7 +111,7 @@ class EnginePicture implements ui.Picture {
   final ui.Rect? cullRect;
 
   @override
-  Future<void> renderToSurface(int width, int height, ui.RenderSurface renderSurface, [bool? flipVertically]) {
+  Future<void> renderToSurface(int width, int height, ui.RenderSurface renderSurface, {bool flipVertical = false}) {
     throw UnimplementedError('Render to surface is only supported by the CanvasKit renderer.');
   }
 }

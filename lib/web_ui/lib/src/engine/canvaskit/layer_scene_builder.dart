@@ -27,9 +27,9 @@ class LayerScene implements ui.Scene {
   }
 
   @override
-  Future<void> renderToSurface(int width, int height, ui.RenderSurface renderSurface, [bool? flipVertically]) async {
+  Future<void> renderToSurface(int width, int height, ui.RenderSurface renderSurface, {bool flipVertical = false}) async {
     final ui.Picture picture = layerTree.flatten();
-    await picture.renderToSurface(width, height, renderSurface, flipVertically);
+    await picture.renderToSurface(width, height, renderSurface, flipVertical: flipVertical);
   }
 }
 

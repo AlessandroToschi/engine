@@ -46,9 +46,11 @@ class Scene extends NativeFieldWrapperClass1 {
     );
   }
 
-  Future<void> renderToSurface(int width, int height, RenderSurface renderSurface) {
+  String? _toImage(int width, int height, _Callback<_Image?> callback) native 'Scene_toImage';
+
+  Future<void> renderToSurface(int width, int height, RenderSurface renderSurface, {bool flipVertical = false}) {
     final Completer<void> completer = Completer<void>.sync();
-    _renderToSurface(width, height, renderSurface, (bool success) {
+    _renderToSurface(width, height, renderSurface, flipVertical, (bool success) {
       if (!success) {
         completer.completeError(RendererBackgroundException());
       } else {
@@ -58,9 +60,8 @@ class Scene extends NativeFieldWrapperClass1 {
     return completer.future;
   }
 
-  String? _toImage(int width, int height, _Callback<_Image?> callback) native 'Scene_toImage';
 
-  void _renderToSurface(int width, int height, RenderSurface renderSurface, void Function(bool success) callback) native 'Scene_renderToSurface';
+  void _renderToSurface(int width, int height, RenderSurface renderSurface, bool flipVertical, void Function(bool success) callback) native 'Scene_renderToSurface';
 
   /// Releases the resources used by this scene.
   ///

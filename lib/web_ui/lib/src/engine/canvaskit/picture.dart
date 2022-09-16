@@ -147,7 +147,7 @@ class CkPicture extends ManagedSkiaObject<SkPicture> implements ui.Picture {
   }
 
   @override
-  Future<void> renderToSurface(int width, int height, ui.RenderSurface renderSurface, [bool? flipVertically]) async {
+  Future<void> renderToSurface(int width, int height, ui.RenderSurface renderSurface, {bool flipVertical = false}) async {
     if (renderSurface.rawSkiaObject== null) {
       throw Exception('Render surface not initialized');
     }
@@ -155,7 +155,7 @@ class CkPicture extends ManagedSkiaObject<SkPicture> implements ui.Picture {
     final SkCanvas canvas = renderSurface.rawSkiaObject!.getCanvas();
     canvas.save();
 
-    if (flipVertically == true) {
+    if (flipVertical) {
       canvas.translate(0, height.toDouble());
       canvas.scale(1, -1);
     }

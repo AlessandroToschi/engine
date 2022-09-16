@@ -5,7 +5,7 @@
 part of ui;
 
 abstract class Scene {
-  Future<void> renderToSurface(int width, int height, RenderSurface renderSurface, [bool? flipVertically]);
+  Future<void> renderToSurface(int width, int height, RenderSurface renderSurface, {bool flipVertical = false});
   Future<Image> toImage(int width, int height);
   void dispose();
 }

@@ -510,7 +510,8 @@ class Rasterizer final : public SnapshotDelegate,
       bool compressed);
 
   bool DrawLayerToSurface(LayerTree* tree,
-                          OffscreenSurface* snapshot_surface) override;
+                          OffscreenSurface* snapshot_surface,
+                          bool flip_vertical) override;
 
   sk_sp<SkImage> DoMakeRasterSnapshot(
       SkISize size,

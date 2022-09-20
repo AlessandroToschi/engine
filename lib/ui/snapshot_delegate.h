@@ -40,7 +40,8 @@ class SnapshotDelegate {
                                        int64_t raw_texture) = 0;
 
   virtual bool DrawLayerToSurface(LayerTree* tree,
-                                  OffscreenSurface* snapshot_surface) = 0;
+                                  OffscreenSurface* snapshot_surface,
+                                  bool flip_vertical) = 0;
 
   virtual RasterCache* GetRasterCache() = 0;
 

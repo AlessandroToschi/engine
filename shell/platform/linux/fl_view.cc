@@ -526,6 +526,11 @@ static void fl_view_constructed(GObject* object) {
   g_signal_connect(rotate, "end", G_CALLBACK(gesture_rotation_end_cb), self);
 }
 
+G_MODULE_EXPORT bool fl_view_make_render_context_current(FlView* view) {
+  g_return_val_if_fail(FL_IS_VIEW(view), false);
+  return fl_renderer_make_current(view->renderer, NULL);
+}
+
 static void fl_view_set_property(GObject* object,
                                  guint prop_id,
                                  const GValue* value,

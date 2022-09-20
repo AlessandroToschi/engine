@@ -89,6 +89,7 @@ Dart_Handle Scene::toImage(uint32_t width,
 void Scene::renderToSurface(int32_t width,
                             int32_t height,
                             fml::RefPtr<RenderSurface> render_surface,
+                            bool flipVertical,
                             Dart_Handle callback) {
   auto* dart_state = UIDartState::Current();
   const auto ui_task_runner = dart_state->GetTaskRunners().GetUITaskRunner();
@@ -112,9 +113,10 @@ void Scene::renderToSurface(int32_t width,
 
   const auto raster_task = fml::MakeCopyable(
       [ui_task = std::move(ui_task), ui_task_runner = std::move(ui_task_runner),
-       this, render_surface, snapshot_delegate]() {
+       this, render_surface, snapshot_delegate, flipVertical]() {
         const auto success = snapshot_delegate->DrawLayerToSurface(
-            layer_tree_.get(), render_surface->get_offscreen_surface());
+            layer_tree_.get(), render_surface->get_offscreen_surface(),
+            flipVertical);
         fml::TaskRunner::RunNowOrPostTask(
             std::move(ui_task_runner),
             [ui_task = std::move(ui_task), success] { ui_task(success); });

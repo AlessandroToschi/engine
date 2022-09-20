@@ -2,27 +2,35 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include "flutter/flow/layers/opacity_layer.h"
+#include "flutter/flow/layers/blend_layer.h"
 
 #include "flutter/flow/layers/cacheable_layer.h"
 #include "third_party/skia/include/core/SkPaint.h"
 
 namespace flutter {
 
-// the opacity_layer couldn't cache itself, so the cache_threshold is the
+// the blend_layer couldn't cache itself, so the cache_threshold is the
 // max_int
-OpacityLayer::OpacityLayer(SkAlpha alpha, const SkPoint& offset)
+
+BlendLayer::BlendLayer(SkAlpha alpha, const SkPoint& offset)
+    : BlendLayer(alpha, offset, SkBlendMode::kSrcOver) {}
+
+BlendLayer::BlendLayer(SkAlpha alpha,
+                           const SkPoint& offset,
+                           SkBlendMode blend_mode)
     : CacheableContainerLayer(std::numeric_limits<int>::max(), true),
       alpha_(alpha),
       offset_(offset),
+      blend_mode_(blend_mode),
       children_can_accept_opacity_(false) {}
 
-void OpacityLayer::Diff(DiffContext* context, const Layer* old_layer) {
+void BlendLayer::Diff(DiffContext* context, const Layer* old_layer) {
   DiffContext::AutoSubtreeRestore subtree(context);
-  auto* prev = static_cast<const OpacityLayer*>(old_layer);
+  auto* prev = static_cast<const BlendLayer*>(old_layer);
   if (!context->IsSubtreeDirty()) {
     FML_DCHECK(prev);
-    if (alpha_ != prev->alpha_ || offset_ != prev->offset_) {
+    if (alpha_ != prev->alpha_ || offset_ != prev->offset_ ||
+        blend_mode_ != prev->blend_mode_) {
       context->MarkSubtreeDirty(context->GetOldLayerPaintRegion(old_layer));
     }
   }
@@ -31,8 +39,8 @@ void OpacityLayer::Diff(DiffContext* context, const Layer* old_layer) {
   context->SetLayerPaintRegion(this, context->CurrentSubtreeRegion());
 }
 
-void OpacityLayer::Preroll(PrerollContext* context, const SkMatrix& matrix) {
-  TRACE_EVENT0("flutter", "OpacityLayer::Preroll");
+void BlendLayer::Preroll(PrerollContext* context, const SkMatrix& matrix) {
+  TRACE_EVENT0("flutter", "BlendLayer::Preroll");
   FML_DCHECK(!layers().empty());  // We can't be a leaf.
 
   SkMatrix child_matrix = matrix;
@@ -79,8 +87,8 @@ void OpacityLayer::Preroll(PrerollContext* context, const SkMatrix& matrix) {
   context->cull_rect = context->cull_rect.makeOffset(offset_.fX, offset_.fY);
 }
 
-void OpacityLayer::Paint(PaintContext& context) const {
-  TRACE_EVENT0("flutter", "OpacityLayer::Paint");
+void BlendLayer::Paint(PaintContext& context) const {
+  TRACE_EVENT0("flutter", "BlendLayer::Paint");
   FML_DCHECK(needs_painting(context));
 
   SkAutoCanvasRestore save(context.internal_nodes_canvas, true);
@@ -98,6 +106,7 @@ void OpacityLayer::Paint(PaintContext& context) const {
 
   SkPaint paint;
   paint.setAlphaf(subtree_opacity);
+  paint.setBlendMode(blend_mode_);
 
   if (layer_raster_cache_item_->Draw(context, &paint)) {
     return;

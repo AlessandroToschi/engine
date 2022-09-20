@@ -375,7 +375,7 @@ class RenderSurface extends engine.ManagedSkiaObject<engine.SkSurface> {
 
   void toBytes(ByteBuffer buffer) {
     if (rawSkiaObject == null) {
-      print('Error: No surface available when doing read.'); // Exceptions are weird from dart2js, print aswell
+      print('Error: No surface available when doing read.'); 
       throw Exception('Failed to create GPU-backed SkSurface for RenderSurface');
     }
     rawSkiaObject!.readPixelsGL(buffer.asUint8List());
@@ -384,21 +384,22 @@ class RenderSurface extends engine.ManagedSkiaObject<engine.SkSurface> {
   engine.SkSurface setup(int width, int height) {
     final engine.SkGrContext? grContext = engine.SurfaceFactory.instance.baseSurface.grContext;
     if (grContext == null) {
-      print('No grContext'); // Exceptions are weird from dart2js, print aswell
+      print('No grContext'); 
       throw Exception('No grContext from baseSurface when setting up RenderSurface.');
     }
     final engine.SkSurface? surface = engine.canvasKit.MakeRenderTarget(grContext, width, height);
 
     if (surface == null) {
-      print('Error: failed to create surface for RenderSurface.'); // Exceptions are weird from dart2js, print aswell
+      print('Error: failed to create surface for RenderSurface.'); 
       throw Exception('Failed to create GPU-backed SkSurface for RenderSurface');
     }
     return surface;
   }
 
-  Image makeImageSnapshotFromSource(Object src) {
+  Image? makeImageSnapshotFromSource(Object src) {
     if (rawSkiaObject == null) {
-      throw Exception("RenderSurface's SkiaSurface is not ready when making image from source.");
+      print("RenderSurface's SkiaSurface is not ready when making image from source.");
+      return null;
     }
 
     rawSkiaObject!.updateFromSource(src, width, height, false);

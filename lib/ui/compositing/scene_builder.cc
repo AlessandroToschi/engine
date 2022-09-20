@@ -14,6 +14,7 @@
 #include "flutter/flow/layers/image_filter_layer.h"
 #include "flutter/flow/layers/layer.h"
 #include "flutter/flow/layers/layer_tree.h"
+#include "flutter/flow/layers/blend_layer.h"
 #include "flutter/flow/layers/opacity_layer.h"
 #include "flutter/flow/layers/performance_overlay_layer.h"
 #include "flutter/flow/layers/physical_shape_layer.h"
@@ -179,7 +180,7 @@ void SceneBuilder::pushBlend(Dart_Handle layer_handle,
                              double dy,
                              int blendMode,
                              fml::RefPtr<EngineLayer> oldLayer) {
-  auto layer = std::make_shared<flutter::OpacityLayer>(
+  auto layer = std::make_shared<flutter::BlendLayer>(
       alpha, SkPoint::Make(dx, dy), static_cast<SkBlendMode>(blendMode));
   PushLayer(layer);
   EngineLayer::MakeRetained(layer_handle, layer);

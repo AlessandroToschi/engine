@@ -16,8 +16,8 @@ BlendLayer::BlendLayer(SkAlpha alpha, const SkPoint& offset)
     : BlendLayer(alpha, offset, SkBlendMode::kSrcOver) {}
 
 BlendLayer::BlendLayer(SkAlpha alpha,
-                           const SkPoint& offset,
-                           SkBlendMode blend_mode)
+                       const SkPoint& offset,
+                       SkBlendMode blend_mode)
     : CacheableContainerLayer(std::numeric_limits<int>::max(), true),
       alpha_(alpha),
       offset_(offset),

@@ -3947,6 +3947,10 @@ class FragmentProgram extends NativeFieldWrapperClass1 {
     return Future<FragmentProgram>.microtask(() => FragmentProgram._(spirv: spirv, debugPrint: debugPrint));
   }
 
+  static FragmentProgram setShader({required String sksl}) {
+    throw UnimplementedError('setShader is not supported on native, use compile instead.');
+  }
+
   @pragma('vm:entry-point')
   FragmentProgram._({
     required ByteBuffer spirv,

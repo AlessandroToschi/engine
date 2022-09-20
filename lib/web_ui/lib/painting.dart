@@ -347,6 +347,86 @@ abstract class Image {
   String toString() => '[$width\u00D7$height]';
 }
 
+abstract class TextureDescriptor {
+  TextureDescriptor._();
+  static TextureDescriptor fromTextureId(int textureId, int width, int height, { PixelFormat pixelFormat = PixelFormat.rgba8888 }) {
+     throw UnimplementedError();
+  }
+
+  static TextureDescriptor fromTexturePointer(int textureId, int width, int height, { PixelFormat pixelFormat = PixelFormat.bgra8888 }) {
+     throw UnimplementedError();
+  }
+}
+
+class RenderSurface extends engine.ManagedSkiaObject<engine.SkSurface> {
+  final Object texture;
+  final int width;
+  final int height;
+
+  RenderSurface._(this.texture, this.width, this.height);
+
+  static Future<RenderSurface> fromTextureId(Object textureId, int width, int height) async {
+    // Setup is run via createDefault in the parent constructor
+    return RenderSurface._(textureId, width, height);
+  }
+
+  @override
+  bool get isResurrectionExpensive => true;
+
+  void toBytes(ByteBuffer buffer) {
+    if (rawSkiaObject == null) {
+      throw Exception('Failed to create GPU-backed SkSurface for RenderSurface');
+    }
+    rawSkiaObject!.readPixelsGL(buffer.asUint8List());
+  }
+
+  engine.SkSurface setup(int width, int height) {
+    final engine.SkGrContext? grContext = engine.SurfaceFactory.instance.baseSurface.grContext;
+    if (grContext == null) {
+      throw Exception('No grContext from baseSurface when setting up RenderSurface.');
+    }
+    final engine.SkSurface? surface = engine.canvasKit.MakeRenderTarget(grContext, width, height);
+
+    if (surface == null) {
+      throw Exception('Failed to create GPU-backed SkSurface for RenderSurface');
+    }
+    return surface;
+  }
+
+  Image? makeImageSnapshotFromSource(Object src) {
+    if (rawSkiaObject == null) {
+      print("RenderSurface's SkiaSurface is not ready when making image from source.");
+      return null;
+    }
+
+    rawSkiaObject!.updateFromSource(src, width, height, false);
+    return engine.CkImage(rawSkiaObject!.makeImageSnapshot());
+  }
+
+  Future<void> dispose() async {
+    // SkSurface.dispose doesn't do anything for GPU-backed surfaces
+  }
+
+  int rawTexture() {
+    throw UnimplementedError();
+  }
+
+  @override
+  engine.SkSurface createDefault() {
+    return setup(width, height);
+  }
+
+  @override
+  void delete() {
+    rawSkiaObject?.delete();
+  }
+
+  @override
+  engine.SkSurface resurrect() {
+    return createDefault();
+  }
+}
+
 abstract class ColorFilter {
   const factory ColorFilter.mode(Color color, BlendMode blendMode) = engine.EngineColorFilter.mode;
   const factory ColorFilter.matrix(List<double> matrix) = engine.EngineColorFilter.matrix;
@@ -835,6 +915,7 @@ class ImageDescriptor {
 }
 
 class FragmentProgram {
+  final engine.CkRuntimeEffect runtimeEffect;
   static Future<FragmentProgram> compile({
     required ByteBuffer spirv,
     bool debugPrint = false,
@@ -842,10 +923,30 @@ class FragmentProgram {
     throw UnsupportedError('FragmentProgram is not supported for the CanvasKit or HTML renderers.');
   }
 
-  FragmentProgram._();
+  FragmentProgram._(String sksl): runtimeEffect = engine.CkRuntimeEffect(sksl);
+
+  static FragmentProgram setShader({
+      required String sksl
+  }) {
+    if (engine.useCanvasKit) {
+        return FragmentProgram._(sksl);
+    }
+
+    throw UnimplementedError('Fragment program is only supported for CanvasKit renderer');
+  }
 
   Shader shader({
     Float32List? floatUniforms,
     List<ImageShader>? samplerUniforms,
-  }) => throw UnsupportedError('FragmentProgram is not supported for the CanvasKit or HTML renderers.');
+  }) {
+    if (floatUniforms == null || samplerUniforms == null) {
+      throw Exception('Passing null float uniforms or samplerUniforms is not supported on web.');
+    }
+
+    if (!engine.useCanvasKit) {
+      throw UnimplementedError('Fragment program is only supported for CanvasKit renderer');
+    }
+
+    return runtimeEffect.makeShader(floatUniforms, samplerUniforms);
+  }
 }

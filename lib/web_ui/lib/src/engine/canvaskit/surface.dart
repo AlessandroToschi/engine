@@ -80,6 +80,7 @@ class Surface {
   /// later.
   void Function(DomEvent)? _cachedContextRestoredListener;
 
+  SkGrContext? get grContext => _grContext;
   SkGrContext? _grContext;
   int? _glContext;
   int? _skiaCacheBytes;

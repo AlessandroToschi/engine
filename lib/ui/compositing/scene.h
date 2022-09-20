@@ -40,6 +40,7 @@ class Scene : public RefCountedDartWrappable<Scene> {
   void renderToSurface(int32_t width,
                        int32_t height,
                        fml::RefPtr<RenderSurface> render_surface,
+                       bool flipVertical,
                        Dart_Handle callback);
 
   void dispose();

@@ -779,13 +779,25 @@ RasterStatus Rasterizer::DrawToSurfaceUnsafe(
 }
 
 bool Rasterizer::DrawLayerToSurface(flutter::LayerTree* tree,
-                                    OffscreenSurface* snapshot_surface) {
+                                    OffscreenSurface* snapshot_surface,
+                                    bool flip_vertical) {
   if (snapshot_surface == nullptr || surface_ == nullptr ||
       surface_->GetContext() == nullptr) {
     return false;
   }
   // Draw the current layer tree into the snapshot surface.
   auto* canvas = snapshot_surface->GetCanvas();
+  canvas->save();
+
+  if (flip_vertical) {
+    // Get backing surface, this should always return a surface here
+    SkSurface* surface = canvas->getSurface();
+    if (surface == nullptr) {
+      return false;
+    }
+    canvas->translate(0, surface->height());
+    canvas->scale(1, -1);
+  }
 
   // There is no root surface transformation for the screenshot layer. Reset the
   // matrix to identity.
@@ -811,6 +823,7 @@ bool Rasterizer::DrawLayerToSurface(flutter::LayerTree* tree,
   canvas->clear(SK_ColorTRANSPARENT);
   frame->Raster(*tree, false, nullptr);
   canvas->flush();
+  canvas->restore();
   return true;
 }
 

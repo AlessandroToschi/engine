@@ -73,7 +73,7 @@ OffscreenSurface::OffscreenSurface(GrDirectContext* surface_context,
 OffscreenSurface::OffscreenSurface(int64_t texture_id,
                                    GrDirectContext* surface_context,
                                    const SkISize& size) {
-#if SK_GL
+#if defined(FML_OS_ANDROID)
   GrGLTextureInfo tInfo;
   tInfo.fTarget = 0x0DE1;  // GR_GL_TEXTURE2D_2D;
   tInfo.fID = texture_id;
@@ -84,6 +84,17 @@ OffscreenSurface::OffscreenSurface(int64_t texture_id,
   offscreen_surface_ = SkSurface::MakeFromBackendTexture(
       reinterpret_cast<GrRecordingContext*>(surface_context), tex,
       kBottomLeft_GrSurfaceOrigin, 1, kRGBA_8888_SkColorType, colorSpace,
+      nullptr, nullptr, nullptr);
+#elif defined(__APPLE__)
+  GrMtlTextureInfo tInfo;
+  tInfo.fTexture =
+      sk_cfp<const void*>(reinterpret_cast<const void*>(texture_id));
+  const GrBackendTexture tex(size.width(), size.height(), GrMipmapped::kNo,
+                             tInfo);
+  const auto colorSpace(SkColorSpace::MakeSRGB());
+  offscreen_surface_ = SkSurface::MakeFromBackendTexture(
+      reinterpret_cast<GrRecordingContext*>(surface_context), tex,
+      kBottomLeft_GrSurfaceOrigin, 1, kBGRA_8888_SkColorType, colorSpace,
       nullptr, nullptr, nullptr);
 #else
   offscreen_surface_ = nullptr;

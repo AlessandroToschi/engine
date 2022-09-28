@@ -1660,6 +1660,8 @@ class Image {
 
   StackTrace? _debugStack;
 
+  void Function()? disposeCallback;
+
   /// The number of image pixels along the image's horizontal axis.
   final int width;
 
@@ -1698,6 +1700,10 @@ class Image {
     final bool removed = _image._handles.remove(this);
     assert(removed);
     if (_image._handles.isEmpty) {
+      final _disposeCallback = disposeCallback;
+      if (_disposeCallback != null) {
+        _disposeCallback();
+      }
       _image.dispose();
     }
   }
@@ -1828,7 +1834,9 @@ class Image {
       );
     }
     assert(!_image._disposed);
-    return Image._(_image, width, height);
+    final Image image = Image._(_image, width, height);
+    image.disposeCallback = disposeCallback;
+    return image;
   }
 
   /// Returns true if `other` is a [clone] of this and thus shares the same

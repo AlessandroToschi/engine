@@ -34,11 +34,6 @@ HOST_DEBUG = make_path("out", "host_debug")
 HOST_PROFILE = make_path("out", "host_profile")
 HOST_RELEASE = make_path("out", "host_release")
 
-FLUTTER_MACOS_PODFILE = make_path(
-    "flutter", "shell", "platform", "darwin", "macos", "framework",
-    "FlutterMacOS.podspec"
-)
-
 TMP_DIR = path.join(DEPLOY_PATH, "tmp")
 
 
@@ -286,7 +281,7 @@ def package_macos_variant(label, arm64_out, x64_out, bucket_name):
   os.mkdir(bucket_directory)
 
   create_macos_framework_command = " ".join([
-      "python", "./flutter/sky/tools/create_macos_framework.py",
+      "python3", "./flutter/sky/tools/create_macos_framework.py",
       f"--dst {label_directory}", f"--arm64-out-dir {arm64_directory}",
       f"--x64-out-dir {x64_directory}"
   ])
@@ -298,7 +293,7 @@ def package_macos_variant(label, arm64_out, x64_out, bucket_name):
   execute_command(create_macos_framework_command)
 
   create_macos_gen_snapshot_command = " ".join([
-      "python", "./flutter/sky/tools/create_macos_gen_snapshots.py",
+      "python3", "./flutter/sky/tools/create_macos_gen_snapshots.py",
       f"--dst {label_directory}", f"--arm64-out-dir {arm64_directory}",
       f"--x64-out-dir {x64_directory}"
   ])
@@ -313,7 +308,7 @@ def package_macos_variant(label, arm64_out, x64_out, bucket_name):
   zip_directory_content(
       macos_framework, path.join(label_directory, "FlutterMacOS.framework")
   )
-  zip(macos_framework_temp, files=[macos_framework, FLUTTER_MACOS_PODFILE])
+  zip(macos_framework_temp, files=[macos_framework])
   os.remove(macos_framework)
   os.rename(macos_framework_temp, macos_framework)
 
@@ -527,7 +522,7 @@ def build_objc_doc():
 def package_ios_variant(
     label,
     arm64_out,
-    armv7_out,
+    armv7_out,  #Deprecated
     sim_x64_out,
     sim_arm64_out,
     bucket_name,
@@ -541,8 +536,8 @@ def package_ios_variant(
       label_directory,
       "--arm64-out-dir",
       path.join(out_directory, arm64_out),
-      "--armv7-out-dir",
-      path.join(out_directory, armv7_out),
+      #"--armv7-out-dir",
+      #path.join(out_directory, armv7_out),
       "--simulator-x64-out-dir",
       path.join(out_directory, sim_x64_out),
       "--simulator-arm64-out-dir",
@@ -564,8 +559,8 @@ def package_ios_variant(
       label_directory,
       '--arm64-out-dir',
       path.join(out_directory, arm64_out),
-      '--armv7-out-dir',
-      path.join(out_directory, armv7_out),
+      #'--armv7-out-dir',
+      #path.join(out_directory, armv7_out),
   ])
 
   execute_command(create_macos_gen_snapshot_command)
@@ -575,11 +570,7 @@ def package_ios_variant(
   zip(
       make_path(DEPLOY_PATH, bucket_name, "artifacts.zip"),
       files=[
-          make_path(
-              "flutter", "shell", "platform", "darwin", "ios", "framework",
-              "Flutter.podspec"
-          ),
-          make_path(label_directory, "gen_snapshot_armv7"),
+          #make_path(label_directory, "gen_snapshot_armv7"),
           make_path(label_directory, "gen_snapshot_arm64")
       ],
       directories=[make_path(label_directory, "Flutter.xcframework")]
@@ -603,31 +594,31 @@ def build_ios():
   # ios_debug
   gn(["--ios", "--runtime-mode", "debug", "--bitcode"])
   # ios_debug_arm
-  gn(["--ios", "--runtime-mode", "debug", "--bitcode", "--ios-cpu=arm"])
+  #gn(["--ios", "--runtime-mode", "debug", "--bitcode", "--ios-cpu=arm"])
   build("ios_debug_sim")
   build("ios_debug_sim_arm64")
   build("ios_debug")
-  build("ios_debug_arm")
-  build_objc_doc()
+  #build("ios_debug_arm")
+  #build_objc_doc()
   package_ios_variant(
       "debug", "ios_debug", "ios_debug_arm", "ios_debug_sim",
       "ios_debug_sim_arm64", "ios"
   )
   gn(['--ios', '--runtime-mode', 'profile', '--bitcode'])
-  gn(['--ios', '--runtime-mode', 'profile', '--bitcode', '--ios-cpu=arm'])
+  #gn(['--ios', '--runtime-mode', 'profile', '--bitcode', '--ios-cpu=arm'])
   build('ios_profile')
-  build('ios_profile_arm')
+  #build('ios_profile_arm')
   package_ios_variant(
       'profile', 'ios_profile', 'ios_profile_arm', 'ios_debug_sim',
       'ios_debug_sim_arm64', 'ios-profile'
   )
   gn(['--ios', '--runtime-mode', 'release', '--bitcode', '--no-goma'])
-  gn([
-      '--ios', '--runtime-mode', 'release', '--bitcode', '--no-goma',
-      '--ios-cpu=arm'
-  ])
+  #gn([
+  #    '--ios', '--runtime-mode', 'release', '--bitcode', '--no-goma',
+  #    '--ios-cpu=arm'
+  #])
   build('ios_release')
-  build('ios_release_arm')
+  #build('ios_release_arm')
   package_ios_variant(
       'release', 'ios_release', 'ios_release_arm', 'ios_debug_sim',
       'ios_debug_sim_arm64', 'ios-release'

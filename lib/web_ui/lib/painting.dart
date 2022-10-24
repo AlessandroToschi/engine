@@ -362,6 +362,7 @@ class RenderSurface extends engine.ManagedSkiaObject<engine.SkSurface> {
   final Object texture;
   final int width;
   final int height;
+  engine.SkGrContext? _grContext;
 
   RenderSurface._(this.texture, this.width, this.height);
 
@@ -385,11 +386,14 @@ class RenderSurface extends engine.ManagedSkiaObject<engine.SkSurface> {
     if (grContext == null) {
       throw Exception('No grContext from baseSurface when setting up RenderSurface.');
     }
+
+    _grContext = grContext;
     final engine.SkSurface? surface = engine.canvasKit.MakeRenderTarget(grContext, width, height);
 
     if (surface == null) {
       throw Exception('Failed to create GPU-backed SkSurface for RenderSurface');
     }
+    
     return surface;
   }
 
@@ -397,6 +401,14 @@ class RenderSurface extends engine.ManagedSkiaObject<engine.SkSurface> {
     if (rawSkiaObject == null) {
       print("RenderSurface's SkiaSurface is not ready when making image from source.");
       return null;
+    }
+
+    // TODO: patchy workaround, fix firing onchange from surface update if possible
+    final engine.SkGrContext? currContext = engine.SurfaceFactory.instance.baseSurface.grContext;
+    if (_grContext != currContext) {
+      delete();
+      rawSkiaObject = setup(width, height);
+      _grContext = currContext;
     }
 
     rawSkiaObject!.updateFromSource(src, width, height, false);

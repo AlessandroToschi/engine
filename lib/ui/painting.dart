@@ -5893,6 +5893,14 @@ class RenderSurface extends NativeFieldWrapperClass1 {
 
   void constructor(int texture) native 'RenderSurface_constructor';
   void setup(int width, int height, void Function() callback) native 'RenderSurface_setup';
+  
+  void toBytes(ByteBuffer buffer) {
+    throw UnimplementedError('toBytes is not implemented for native');
+  }
+
+  Image? makeImageSnapshotFromSource(Object src) {
+     throw UnimplementedError('makeImageSnapshotFromSource is not implemented for native');
+  }
 
   Future<void> dispose() async {
     final Completer<void> completer = Completer<void>.sync();

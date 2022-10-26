@@ -82,7 +82,7 @@ class CkHtmlImage implements ui.Codec {
     );
 
     final ui.FrameInfo currentFrame = AnimatedImageFrameInfo(
-      const Duration(milliseconds: 10000000),
+      const Duration(microseconds: 0),
       CkImage(skImage!),
     );
 

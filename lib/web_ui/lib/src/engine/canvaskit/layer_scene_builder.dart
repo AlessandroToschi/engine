@@ -179,6 +179,17 @@ class LayerSceneBuilder implements ui.SceneBuilder {
   }
 
   @override
+  BlendEngineLayer pushBlend(
+    int alpha,
+    ui.BlendMode blendMode, {
+    ui.Offset offset = ui.Offset.zero,
+    ui.EngineLayer? oldLayer,
+  }) {
+    // throw UnimplementedError('not implemented');
+    return pushLayer<BlendEngineLayer>(BlendEngineLayer(alpha, blendMode, offset));
+  }
+
+  @override
   PhysicalShapeEngineLayer pushPhysicalShape({
     required ui.Path path,
     required double elevation,

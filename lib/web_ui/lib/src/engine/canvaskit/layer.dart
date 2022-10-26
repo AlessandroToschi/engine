@@ -383,7 +383,7 @@ class BlendEngineLayer extends ContainerLayer
 
     paintContext.internalNodesCanvas.save();
     paintContext.internalNodesCanvas.translate(_offset.dx, _offset.dy);
-    
+
     final ui.Rect saveLayerBounds = paintBounds.shift(-_offset);
 
     paintContext.internalNodesCanvas.saveLayer(saveLayerBounds, paint);

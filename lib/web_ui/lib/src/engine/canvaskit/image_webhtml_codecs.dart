@@ -67,7 +67,7 @@ class CkHtmlImage implements ui.Codec {
     assert(_debugCheckIsNotDisposed());
 
     final DomHTMLImageElement img = _imageElement!;
-    
+
     await img.decode();
 
     final SkImage? skImage = canvasKit.MakeLazyImageFromTextureSource(

@@ -393,7 +393,7 @@ class RenderSurface extends engine.ManagedSkiaObject<engine.SkSurface> {
     if (surface == null) {
       throw Exception('Failed to create GPU-backed SkSurface for RenderSurface');
     }
-    
+
     return surface;
   }
 

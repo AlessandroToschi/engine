@@ -582,7 +582,7 @@ class SurfaceSceneBuilder implements ui.SceneBuilder {
   ) {
     throw UnimplementedError();
   }
-  
+
   @override
   ui.BlendEngineLayer pushBlend(int alpha, ui.BlendMode blendMode, {ui.Offset offset = ui.Offset.zero, ui.EngineLayer? oldLayer,}) {
     throw UnimplementedError('Blend is not implemented for the html renderer');

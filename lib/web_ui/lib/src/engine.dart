@@ -32,6 +32,7 @@ export 'engine/canvaskit/image.dart';
 export 'engine/canvaskit/image_filter.dart';
 export 'engine/canvaskit/image_wasm_codecs.dart';
 export 'engine/canvaskit/image_web_codecs.dart';
+export 'engine/canvaskit/image_webhtml_codecs.dart';
 export 'engine/canvaskit/initialization.dart';
 export 'engine/canvaskit/interval_tree.dart';
 export 'engine/canvaskit/layer.dart';

@@ -479,7 +479,6 @@ class SceneBuilder extends NativeFieldWrapperClass1 {
       native 'SceneBuilder_pushOpacity';
 
   /// Pushes a color filter operation onto the operation stack.
-  /// TODO: rest of documentation
   BlendEngineLayer pushBlend(
     int alpha,
     BlendMode blendMode, {

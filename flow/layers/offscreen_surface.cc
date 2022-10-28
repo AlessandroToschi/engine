@@ -4,6 +4,7 @@
 
 #include "flutter/flow/layers/offscreen_surface.h"
 
+#include "flutter/fml/build_config.h"
 #include "third_party/skia/include/core/SkImageEncoder.h"
 #include "third_party/skia/include/core/SkPictureRecorder.h"
 #include "third_party/skia/include/core/SkSerialProcs.h"
@@ -85,7 +86,7 @@ OffscreenSurface::OffscreenSurface(int64_t texture_id,
       reinterpret_cast<GrRecordingContext*>(surface_context), tex,
       kBottomLeft_GrSurfaceOrigin, 1, kRGBA_8888_SkColorType, colorSpace,
       nullptr, nullptr, nullptr);
-#elif defined(__APPLE__)
+#elif defined(FML_OS_IOS) || defined(FML_OS_MACOSX)
   GrMtlTextureInfo tInfo;
   tInfo.fTexture =
       sk_cfp<const void*>(reinterpret_cast<const void*>(texture_id));

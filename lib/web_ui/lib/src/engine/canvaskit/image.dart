@@ -14,6 +14,7 @@ import '../util.dart';
 import 'canvaskit_api.dart';
 import 'image_wasm_codecs.dart';
 import 'image_web_codecs.dart';
+import 'image_webhtml_codecs.dart';
 import 'skia_object_cache.dart';
 
 /// Instantiates a [ui.Codec] backed by an `SkAnimatedImage` from Skia.
@@ -29,7 +30,7 @@ FutureOr<ui.Codec> skiaInstantiateImageCodec(Uint8List list,
       targetHeight: targetHeight,
     );
   } else {
-    return CkAnimatedImage.decodeFromBytes(list, 'encoded image bytes');
+    return CkHtmlImage.decodeFromBytes(list, 'encoded image bytes');
   }
 }
 
@@ -93,11 +94,11 @@ void debugRestoreHttpRequestFactory() {
 /// requesting from URI.
 Future<ui.Codec> skiaInstantiateWebImageCodec(
     String url, WebOnlyImageCodecChunkCallback? chunkCallback) async {
-  final Uint8List list = await fetchImage(url, chunkCallback);
   if (browserSupportsImageDecoder) {
+    final Uint8List list = await fetchImage(url, chunkCallback);
     return CkBrowserImageDecoder.create(data: list, debugSource: url.toString());
   } else {
-    return CkAnimatedImage.decodeFromBytes(list, url);
+    return CkHtmlImage.decodeFromUrl(url);
   }
 }
 

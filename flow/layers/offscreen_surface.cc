@@ -10,6 +10,7 @@
 #include "third_party/skia/include/core/SkSurface.h"
 #include "third_party/skia/include/core/SkSurfaceCharacterization.h"
 #include "third_party/skia/include/utils/SkBase64.h"
+#include "flutter/fml/build_config.h"
 
 namespace flutter {
 
@@ -85,7 +86,7 @@ OffscreenSurface::OffscreenSurface(int64_t texture_id,
       reinterpret_cast<GrRecordingContext*>(surface_context), tex,
       kBottomLeft_GrSurfaceOrigin, 1, kRGBA_8888_SkColorType, colorSpace,
       nullptr, nullptr, nullptr);
-#elif defined(__APPLE__)
+#elif defined(FML_OS_IOS) || defined(FML_OS_MACOSX)
   GrMtlTextureInfo tInfo;
   tInfo.fTexture =
       sk_cfp<const void*>(reinterpret_cast<const void*>(texture_id));

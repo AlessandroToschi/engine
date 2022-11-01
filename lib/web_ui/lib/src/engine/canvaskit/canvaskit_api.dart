@@ -2099,6 +2099,10 @@ extension SkFontFeatureExtension on SkFontFeature {
 @staticInterop
 class SkTypeface {}
 
+extension SkTypefaceExtension on SkTypeface {
+  external void delete();
+}
+
 @JS('window.flutterCanvasKit.Font')
 @staticInterop
 class SkFont {
@@ -2249,6 +2253,7 @@ class SkTypefaceFactory {}
 
 extension SkTypefaceFactoryExtension on SkTypefaceFactory {
   external SkTypeface? MakeFreeTypeFaceFromData(ByteBuffer fontData);
+  external void unloadTypeFace(SkTypeface? typeface);
 }
 
 /// Collects Skia objects that are no longer necessary.

@@ -4,8 +4,11 @@
 
 #include "flutter/flow/layers/blend_layer.h"
 
+#include "flutter/flow/raster_cache_util.h"
 #include "flutter/flow/layers/cacheable_layer.h"
 #include "third_party/skia/include/core/SkPaint.h"
+
+#include <iostream>
 
 namespace flutter {
 
@@ -35,6 +38,10 @@ void BlendLayer::Diff(DiffContext* context, const Layer* old_layer) {
     }
   }
   context->PushTransform(SkMatrix::Translate(offset_.fX, offset_.fY));
+   if (context->has_raster_cache()) {
+    context->SetTransform(
+        RasterCacheUtil::GetIntegralTransCTM(context->GetTransform()));
+  }
   DiffChildren(context, prev);
   context->SetLayerPaintRegion(this, context->CurrentSubtreeRegion());
 }
@@ -55,7 +62,7 @@ void BlendLayer::Preroll(PrerollContext* context, const SkMatrix& matrix) {
   context->mutators_stack.PushOpacity(alpha_);
 
   AutoCache auto_cache =
-      AutoCache(layer_raster_cache_item_.get(), context, matrix);
+      AutoCache(layer_raster_cache_item_.get(), context, child_matrix);
   Layer::AutoPrerollSaveLayerState save =
       Layer::AutoPrerollSaveLayerState::Create(context);
 
@@ -71,6 +78,7 @@ void BlendLayer::Preroll(PrerollContext* context, const SkMatrix& matrix) {
   // Now we let our parent layers know that we, too, can inherit opacity
   // regardless of what our children are capable of
   context->subtree_can_inherit_opacity = true;
+  context->mutators_stack.Pop();
   context->mutators_stack.Pop();
   context->mutators_stack.Pop();
 
@@ -93,6 +101,11 @@ void BlendLayer::Paint(PaintContext& context) const {
 
   SkAutoCanvasRestore save(context.internal_nodes_canvas, true);
   context.internal_nodes_canvas->translate(offset_.fX, offset_.fY);
+  if (context.raster_cache) {
+    context.internal_nodes_canvas->setMatrix(
+        RasterCacheUtil::GetIntegralTransCTM(
+            context.leaf_nodes_canvas->getTotalMatrix()));
+  }
 
   SkScalar inherited_opacity = context.inherited_opacity;
   SkScalar subtree_opacity = opacity() * inherited_opacity;

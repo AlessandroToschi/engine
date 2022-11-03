@@ -3143,4 +3143,7 @@ FutureOr<void> _sendFontChangeMessage() async {
   }
 }
 
+Future<void> unloadFontFamily(String fontFamily) {
+  throw UnimplementedError('Unloading font is only supported on CanvasKit rendered web.');
+}
 void _loadFontFromList(Uint8List list, _Callback<void> callback, String fontFamily) native 'loadFontFromList';

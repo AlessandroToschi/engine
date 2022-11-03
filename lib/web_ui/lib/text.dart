@@ -754,6 +754,15 @@ abstract class ParagraphBuilder {
   });
 }
 
+
+Future<void> unloadFontFamily(String fontFamily) {
+  if (!engine.useCanvasKit) {
+    throw Exception('Font unloading is only supported for canvaskit renderer');
+  }
+
+  return engine.skiaFontCollection.unloadFontFamily(fontFamily).then((_) => engine.sendFontChangeMessage());
+}
+
 Future<void> loadFontFromList(Uint8List list, {String? fontFamily}) {
   if (engine.useCanvasKit) {
     return engine.skiaFontCollection

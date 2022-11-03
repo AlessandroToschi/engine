@@ -822,7 +822,7 @@ bool Rasterizer::DrawLayerToSurface(flutter::LayerTree* tree,
   );
   canvas->clear(SK_ColorTRANSPARENT);
   frame->Raster(*tree, false, nullptr);
-  canvas->flush();
+  surface_->GetContext()->flushAndSubmit(true);
   canvas->restore();
   return true;
 }

@@ -46,7 +46,6 @@ void BlendLayer::Diff(DiffContext* context, const Layer* old_layer) {
 
 void BlendLayer::Preroll(PrerollContext* context, const SkMatrix& matrix) {
   TRACE_EVENT0("flutter", "BlendLayer::Preroll");
-  FML_DCHECK(!layers().empty());  // We can't be a leaf.
 
   SkMatrix child_matrix = matrix;
   child_matrix.preTranslate(offset_.fX, offset_.fY);

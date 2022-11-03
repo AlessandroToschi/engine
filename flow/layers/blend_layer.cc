@@ -4,8 +4,8 @@
 
 #include "flutter/flow/layers/blend_layer.h"
 
-#include "flutter/flow/raster_cache_util.h"
 #include "flutter/flow/layers/cacheable_layer.h"
+#include "flutter/flow/raster_cache_util.h"
 #include "third_party/skia/include/core/SkPaint.h"
 
 #include <iostream>
@@ -38,7 +38,7 @@ void BlendLayer::Diff(DiffContext* context, const Layer* old_layer) {
     }
   }
   context->PushTransform(SkMatrix::Translate(offset_.fX, offset_.fY));
-   if (context->has_raster_cache()) {
+  if (context->has_raster_cache()) {
     context->SetTransform(
         RasterCacheUtil::GetIntegralTransCTM(context->GetTransform()));
   }

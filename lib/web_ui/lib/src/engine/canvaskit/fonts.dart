@@ -112,7 +112,7 @@ class SkiaFontCollection {
   }
 
   Future<void> unloadFontFamily(String fontFamily) async {
-    _downloadedFonts.where((RegisteredFont font) => font.family == fontFamily).forEach((RegisteredFont font) { 
+    _downloadedFonts.where((RegisteredFont font) => font.family == fontFamily).forEach((RegisteredFont font) {
         font.typeface.delete();
     });
     _downloadedFonts.removeWhere((RegisteredFont font) => font.family == fontFamily);

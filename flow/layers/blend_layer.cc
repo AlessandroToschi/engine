@@ -8,8 +8,6 @@
 #include "flutter/flow/raster_cache_util.h"
 #include "third_party/skia/include/core/SkPaint.h"
 
-#include <iostream>
-
 namespace flutter {
 
 // the blend_layer couldn't cache itself, so the cache_threshold is the
@@ -78,7 +76,6 @@ void BlendLayer::Preroll(PrerollContext* context, const SkMatrix& matrix) {
   // Now we let our parent layers know that we, too, can inherit opacity
   // regardless of what our children are capable of
   context->subtree_can_inherit_opacity = true;
-  context->mutators_stack.Pop();
   context->mutators_stack.Pop();
   context->mutators_stack.Pop();
 

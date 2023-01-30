@@ -318,6 +318,11 @@ class HtmlViewEmbedder {
           final DomElement clipView = head.parent!;
           clipView.style.clip = '';
           clipView.style.clipPath = '';
+          // We need to set width and height for the clipView to cover the
+          // bounds of the path since Safari seem to incorrectly intersect
+          // the  element bounding rect with the clip path.
+          clipView.style.width = '100%';
+          clipView.style.height = '100%';
           headTransform = Matrix4.identity();
           clipView.style.transform = '';
           if (mutator.rect != null) {

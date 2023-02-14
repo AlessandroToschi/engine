@@ -416,6 +416,7 @@ class RenderSurface extends engine.ManagedSkiaObject<engine.SkSurface> {
     }
 
     rawSkiaObject!.updateFromSource(src, width, height, false);
+    rawSkiaObject!.flush();
     return engine.CkImage(rawSkiaObject!.makeImageSnapshot());
   }
 

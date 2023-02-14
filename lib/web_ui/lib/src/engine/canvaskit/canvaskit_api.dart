@@ -2134,6 +2134,7 @@ class TypefaceFontProvider extends SkFontMgr {
 
 extension TypefaceFontProviderExtension on SkFontMgr {
   external void registerFont(Uint8List font, String family);
+  external void registerFontFromTypeface(SkTypeface typeface, String family);
 }
 
 @JS()

@@ -231,7 +231,7 @@ class FontFallbackData {
     final String countedFamily = '$family $fontFallbackTag';
     // Insert emoji font before all other fallback fonts so we use the emoji
     // whenever it's available.
-    registeredFallbackFonts.add(RegisteredFont(bytes, countedFamily, typeface));
+    registeredFallbackFonts.add(RegisteredFont(countedFamily, typeface));
     // Insert emoji font before all other fallback fonts so we use the emoji
     // whenever it's available.
     if (family == 'Noto Color Emoji Compat') {

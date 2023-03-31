@@ -102,18 +102,18 @@ def build_host():
   print("Generating host_debug")
   gn([
       "--runtime-mode", "debug", "--no-lto", "--full-dart-sdk",
-      "--prebuilt-dart-sdk", "--build-embedder-examples"
+      "--no-prebuilt-dart-sdk", "--build-embedder-examples"
   ])
   # host_profile
   print("Generating host_profile")
   gn([
-      "--runtime-mode", "profile", "--no-lto", "--prebuilt-dart-sdk",
+      "--runtime-mode", "profile", "--no-lto", "--no-prebuilt-dart-sdk",
       "--build-embedder-examples"
   ])
   # host_release
   print("Generating host_release")
   gn([
-      "--runtime-mode", "release", "--no-lto", "--prebuilt-dart-sdk",
+      "--runtime-mode", "release", "--no-lto", "--no-prebuilt-dart-sdk",
       "--build-embedder-examples"
   ])
   # build host_debug
@@ -169,19 +169,19 @@ def build_mac():
   print("Generating mac_debug_arm64")
   gn([
       "--mac", "--mac-cpu", "arm64", "--runtime-mode", "debug", "--no-lto",
-      "--full-dart-sdk", "--prebuilt-dart-sdk"
+      "--full-dart-sdk", "--no-prebuilt-dart-sdk"
   ])
   # mac_profile_arm64
   print("Generating mac_profile_arm64")
   gn([
       "--mac", "--mac-cpu", "arm64", "--runtime-mode", "profile", "--no-lto",
-      "--prebuilt-dart-sdk"
+      "--no-prebuilt-dart-sdk"
   ])
   # mac_release_arm64
   print("Generating mac_release_arm64")
   gn([
       "--mac", "--mac-cpu", "arm64", "--runtime-mode", "release", "--no-lto",
-      "--prebuilt-dart-sdk"
+      "--no-prebuilt-dart-sdk"
   ])
   # build host_debug
   build("mac_debug_arm64")

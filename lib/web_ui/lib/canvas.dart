@@ -154,6 +154,7 @@ abstract class Canvas {
 }
 
 abstract class Picture {
+  Future<void> renderToSurface(int width, int height, RenderSurface renderSurface, {bool flipVertical = false});
   Future<Image> toImage(int width, int height);
   void dispose();
   bool get debugDisposed;

@@ -68,6 +68,7 @@ extension H5vccExtension on H5vcc {
 class CanvasKit {}
 
 extension CanvasKitExtension on CanvasKit {
+  external SkRuntimeEffect get RuntimeEffect;
   external SkBlendModeEnum get BlendMode;
   external SkPaintStyleEnum get PaintStyle;
   external SkStrokeCapEnum get StrokeCap;
@@ -116,6 +117,8 @@ extension CanvasKitExtension on CanvasKit {
   external Uint8List getDataBytes(
     SkData skData,
   );
+
+  external SkSurface? MakeRenderTarget(SkGrContext grContext, int width, int height);
 
   // Text decoration enum is embedded in the CanvasKit object itself.
   external int get NoDecoration;
@@ -222,6 +225,21 @@ extension SkSurfaceExtension on SkSurface {
   external int height();
   external void dispose();
   external SkImage makeImageSnapshot();
+  external void updateFromSource(Object src, int width, int height, bool srcIsPremul);
+  external SkImage? makeImageFromTextureSource(Object src, SkImageInfo? info, bool srcIsPremul);
+  external void readPixelsGL(Uint8List buffer, SkGrContext grContext);
+  external void delete();
+}
+
+@JS('window.flutterCanvasKit.RuntimeEffect')
+@staticInterop
+class SkRuntimeEffect {}
+
+extension SkRuntimeEffectExtension on SkRuntimeEffect {
+  external SkShader makeShader(Float32List floats, Float32List? matrix);
+  external SkShader makeShaderWithChildren(Float32List floats, List<SkShader> children, Float32List? matrix);
+  external SkRuntimeEffect Make(String sksl);
+  external void delete();
 }
 
 @JS()
@@ -2081,6 +2099,10 @@ extension SkFontFeatureExtension on SkFontFeature {
 @staticInterop
 class SkTypeface {}
 
+extension SkTypefaceExtension on SkTypeface {
+  external void delete();
+}
+
 @JS('window.flutterCanvasKit.Font')
 @staticInterop
 class SkFont {
@@ -2112,6 +2134,7 @@ class TypefaceFontProvider extends SkFontMgr {
 
 extension TypefaceFontProviderExtension on SkFontMgr {
   external void registerFont(Uint8List font, String family);
+  external void registerFontFromTypeface(SkTypeface typeface, String family);
 }
 
 @JS()
@@ -2231,6 +2254,7 @@ class SkTypefaceFactory {}
 
 extension SkTypefaceFactoryExtension on SkTypefaceFactory {
   external SkTypeface? MakeFreeTypeFaceFromData(ByteBuffer fontData);
+  external void unloadTypeFace(SkTypeface? typeface);
 }
 
 /// Collects Skia objects that are no longer necessary.

@@ -1660,11 +1660,27 @@ class Image {
 
   StackTrace? _debugStack;
 
+  void Function()? disposeCallback;
+
   /// The number of image pixels along the image's horizontal axis.
   final int width;
 
   /// The number of image pixels along the image's vertical axis.
   final int height;
+
+  static List<Image?> fromTextures(List<TextureDescriptor> textureDescriptors) {
+    final List<Image?> images = _Image.fromTextures(textureDescriptors.map((TextureDescriptor e) => e._rawValues).toList(growable: false)).map((_Image?_image) => _image != null ? Image._(_image, _image.width, _image.height) : null).toList(growable: false);
+    final int inLength = textureDescriptors.length;
+    final int outLength = images.length;
+    if (inLength != outLength) {
+        for (final Image? image in images) {
+            image?.dispose();
+        }
+        throw RendererBackgroundException();
+    }
+
+    return images;
+  }
 
   bool _disposed = false;
   /// Release this handle's claim on the underlying Image. This handle is no
@@ -1684,6 +1700,10 @@ class Image {
     final bool removed = _image._handles.remove(this);
     assert(removed);
     if (_image._handles.isEmpty) {
+      final _disposeCallback = disposeCallback;
+      if (_disposeCallback != null) {
+        _disposeCallback();
+      }
       _image.dispose();
     }
   }
@@ -1814,7 +1834,9 @@ class Image {
       );
     }
     assert(!_image._disposed);
-    return Image._(_image, width, height);
+    final Image image = Image._(_image, width, height);
+    image.disposeCallback = disposeCallback;
+    return image;
   }
 
   /// Returns true if `other` is a [clone] of this and thus shares the same
@@ -1845,6 +1867,8 @@ class _Image extends NativeFieldWrapperClass1 {
   int get width native 'Image_width';
 
   int get height native 'Image_height';
+
+  static List<_Image?> fromTextures(List<Int64List> textureDescriptors) native 'Image_FromTextures';
 
   Future<ByteData?> toByteData({ImageByteFormat format = ImageByteFormat.rawRgba}) {
     return _futurize((_Callback<ByteData> callback) {
@@ -1881,6 +1905,23 @@ class _Image extends NativeFieldWrapperClass1 {
 
 /// Callback signature for [decodeImageFromList].
 typedef ImageDecoderCallback = void Function(Image result);
+
+@pragma('vm:entry-point')
+class TextureDescriptor {
+
+  @pragma('vm:entry-point')
+  TextureDescriptor._(this._rawValues);
+
+  static TextureDescriptor fromTextureId(int textureId, int width, int height, { PixelFormat pixelFormat = PixelFormat.rgba8888 }) {
+    return TextureDescriptor._(Int64List.fromList([0, textureId, width, height, pixelFormat.index]));
+  }
+
+  static TextureDescriptor fromTexturePointer(int texturePointer, int width, int height, { PixelFormat pixelFormat = PixelFormat.bgra8888 }) {
+    return TextureDescriptor._(Int64List.fromList([1, texturePointer, width, height, pixelFormat.index]));
+  }
+
+  final Int64List _rawValues;
+}
 
 /// Information for a single frame of an animation.
 ///
@@ -3914,6 +3955,10 @@ class FragmentProgram extends NativeFieldWrapperClass1 {
     return Future<FragmentProgram>.microtask(() => FragmentProgram._(spirv: spirv, debugPrint: debugPrint));
   }
 
+  static FragmentProgram setShader({required String sksl}) {
+    throw UnimplementedError('setShader is not supported on native, use compile instead.');
+  }
+
   @pragma('vm:entry-point')
   FragmentProgram._({
     required ByteBuffer spirv,
@@ -5829,6 +5874,44 @@ class ImageDescriptor extends NativeFieldWrapperClass1 {
     return codec;
   }
   void _instantiateCodec(Codec outCodec, int targetWidth, int targetHeight) native 'ImageDescriptor_instantiateCodec';
+}
+
+
+class RenderSurface extends NativeFieldWrapperClass1 {
+  RenderSurface._(int texture) {
+    constructor(texture);
+  }
+
+  static Future<RenderSurface> fromTextureId(int textureId, int width, int height) {
+    final RenderSurface renderSurface = RenderSurface._(textureId);
+    final Completer<RenderSurface> completer = Completer<RenderSurface>.sync();
+    renderSurface.setup(width, height, () {
+      completer.complete(renderSurface);
+    });
+    return completer.future;
+  }
+
+  void constructor(int texture) native 'RenderSurface_constructor';
+  void setup(int width, int height, void Function() callback) native 'RenderSurface_setup';
+
+  void toBytes(ByteBuffer buffer) {
+    throw UnimplementedError('toBytes is not implemented for native');
+  }
+
+  Image? makeImageSnapshotFromSource(Object src) {
+     throw UnimplementedError('makeImageSnapshotFromSource is not implemented for native');
+  }
+
+  Future<void> dispose() async {
+    final Completer<void> completer = Completer<void>.sync();
+    _dispose(() {
+      completer.complete();
+    });
+    return completer.future;
+  }
+  void _dispose(void Function() callback) native 'RenderSurface_dispose';
+
+  int rawTexture() native 'RenderSurface_raw_texture';
 }
 
 /// Generic callback signature, used by [_futurize].

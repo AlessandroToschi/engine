@@ -493,6 +493,7 @@ extension DomHTMLImageElementExtension on DomHTMLImageElement {
   external int get naturalHeight;
   external set width(int? value);
   external set height(int? value);
+  external set crossOrigin(String? value);
   Future<dynamic> decode() =>
       js_util.promiseToFuture(js_util.callMethod(this, 'decode', <Object>[]));
 }

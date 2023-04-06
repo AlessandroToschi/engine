@@ -103,6 +103,8 @@ class WeakPtr {
     return get();
   }
 
+  T* unsafeGet() const { return (flag_ && flag_->is_valid()) ? ptr_ : nullptr; }
+
  protected:
   explicit WeakPtr(T* ptr, fml::RefPtr<fml::internal::WeakPtrFlag>&& flag)
       : ptr_(ptr), flag_(std::move(flag)) {}

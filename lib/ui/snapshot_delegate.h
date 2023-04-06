@@ -6,6 +6,9 @@
 #define FLUTTER_LIB_UI_SNAPSHOT_DELEGATE_H_
 
 #include <string>
+#include "flutter/flow/layers/layer_tree.h"
+#include "flutter/flow/layers/offscreen_surface.h"
+#include "flutter/lib/ui/painting/texture_descriptor.h"
 
 #include "flutter/display_list/display_list.h"
 #include "third_party/skia/include/core/SkImage.h"
@@ -28,6 +31,21 @@ class SnapshotDelegate {
                                             SkISize picture_size) = 0;
 
   virtual sk_sp<SkImage> ConvertToRasterImage(sk_sp<SkImage> image) = 0;
+
+  virtual sk_sp<SkImage> UploadTexture(
+      std::shared_ptr<TextureDescriptor>& descriptor) = 0;
+
+  virtual sk_sp<SkSurface> MakeSurface(int32_t width,
+                                       int32_t height,
+                                       int64_t raw_texture) = 0;
+
+  virtual bool DrawLayerToSurface(LayerTree* tree,
+                                  OffscreenSurface* snapshot_surface,
+                                  bool flip_vertical) = 0;
+
+  virtual RasterCache* GetRasterCache() = 0;
+
+  virtual GrDirectContext* GetContext() = 0;
 };
 
 }  // namespace flutter

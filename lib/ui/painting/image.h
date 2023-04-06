@@ -11,6 +11,7 @@
 #include "flutter/lib/ui/painting/display_list_image_gpu.h"
 #include "flutter/lib/ui/ui_dart_state.h"
 #include "third_party/skia/include/core/SkImage.h"
+#include "third_party/tonic/typed_data/typed_list.h"
 
 namespace tonic {
 class DartLibraryNatives;
@@ -44,6 +45,8 @@ class CanvasImage final : public RefCountedDartWrappable<CanvasImage> {
   size_t GetAllocationSize() const override;
 
   static void RegisterNatives(tonic::DartLibraryNatives* natives);
+
+  static void FromTextures(Dart_NativeArguments args);
 
  private:
   CanvasImage();

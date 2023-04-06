@@ -61,7 +61,7 @@ class SkiaFontCollection {
     familyToFontMap.clear();
 
     for (final RegisteredFont font in _downloadedFonts) {
-      fontProvider!.registerFont(font.bytes, font.family);
+      fontProvider!.registerFontFromTypeface(font.typeface, font.family);
       familyToFontMap
           .putIfAbsent(font.family, () => <SkFont>[])
           .add(SkFont(font.typeface));
@@ -69,7 +69,7 @@ class SkiaFontCollection {
 
     for (final RegisteredFont font
         in FontFallbackData.instance.registeredFallbackFonts) {
-      fontProvider!.registerFont(font.bytes, font.family);
+      fontProvider!.registerFontFromTypeface(font.typeface, font.family);
       familyToFontMap
           .putIfAbsent(font.family, () => <SkFont>[])
           .add(SkFont(font.typeface));
@@ -103,12 +103,20 @@ class SkiaFontCollection {
     final SkTypeface? typeface =
         canvasKit.Typeface.MakeFreeTypeFaceFromData(list.buffer);
     if (typeface != null) {
-      _downloadedFonts.add(RegisteredFont(list, fontFamily, typeface));
+      _downloadedFonts.add(RegisteredFont(fontFamily, typeface));
       await ensureFontsLoaded();
     } else {
       printWarning('Failed to parse font family "$fontFamily"');
       return;
     }
+  }
+
+  Future<void> unloadFontFamily(String fontFamily) async {
+    _downloadedFonts.where((RegisteredFont font) => font.family == fontFamily).forEach((RegisteredFont font) {
+        font.typeface.delete();
+    });
+    _downloadedFonts.removeWhere((RegisteredFont font) => font.family == fontFamily);
+    await ensureFontsLoaded();
   }
 
   /// Loads fonts from `FontManifest.json`.
@@ -189,7 +197,7 @@ class SkiaFontCollection {
       final SkTypeface? typeface =
           canvasKit.Typeface.MakeFreeTypeFaceFromData(bytes.buffer);
       if (typeface != null) {
-        return RegisteredFont(bytes, family, typeface);
+        return RegisteredFont(family, typeface);
       } else {
         printWarning('Failed to load font $family at $url');
         printWarning('Verify that $url contains a valid font.');
@@ -225,15 +233,12 @@ class RegisteredFont {
   /// The font family name for this font.
   final String family;
 
-  /// The byte data for this font.
-  final Uint8List bytes;
-
   /// The [SkTypeface] created from this font's [bytes].
   ///
   /// This is used to determine which code points are supported by this font.
   final SkTypeface typeface;
 
-  RegisteredFont(this.bytes, this.family, this.typeface) {
+  RegisteredFont(this.family, this.typeface) {
     // This is a hack which causes Skia to cache the decoded font.
     final SkFont skFont = SkFont(typeface);
     skFont.getGlyphBounds(<int>[0], null, null);

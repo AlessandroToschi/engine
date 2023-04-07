@@ -19,11 +19,6 @@ TextureMTL::TextureMTL(TextureDescriptor p_desc,
     return;
   }
 
-  if (desc.size != GetSize()) {
-    VALIDATION_LOG << "The texture and its descriptor disagree about its size.";
-    return;
-  }
-
   is_wrapped_ = wrapped;
   is_valid_ = true;
 }
@@ -31,6 +26,15 @@ TextureMTL::TextureMTL(TextureDescriptor p_desc,
 std::shared_ptr<TextureMTL> TextureMTL::Wrapper(TextureDescriptor desc,
                                                 id<MTLTexture> texture) {
   return std::make_shared<TextureMTL>(desc, texture, true);
+}
+
+std::shared_ptr<TextureMTL> TextureMTL::TexturePointerWrapper(
+    TextureDescriptor desc,
+    int64_t texture_pointer) {
+  void* texture_void_pointer = reinterpret_cast<void*>(texture_pointer);
+  id<MTLTexture> texture = (__bridge id)texture_void_pointer;
+  CFRelease(texture_void_pointer);
+  return TextureMTL::Wrapper(desc, texture);
 }
 
 TextureMTL::~TextureMTL() = default;

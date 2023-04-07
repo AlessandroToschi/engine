@@ -34,6 +34,16 @@ class SkwasmPicture implements ui.Picture {
     // TODO(jacksongardner): implement toImageSync
     throw UnimplementedError();
   }
+
+  @override
+  Future<void> renderToSurface(ui.RenderSurface renderSurface, {bool flipVertical = false}) {
+    throw UnimplementedError();
+  }
+
+  @override
+  Future<Object?> toCanvas(int width, int height) {
+    throw UnimplementedError();
+  }
 }
 
 class SkwasmPictureRecorder implements ui.PictureRecorder {

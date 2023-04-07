@@ -222,7 +222,12 @@ class FontFallbackData {
     }
     // Insert emoji font before all other fallback fonts so we use the emoji
     // whenever it's available.
-    registeredFallbackFonts.add(RegisteredFont(bytes, family, typeface));
+
+    if (apiHasRegisterFontFromTypeface){
+      registeredFallbackFonts.add(RegisteredFont(null, family, typeface));
+    } else {
+      registeredFallbackFonts.add(RegisteredFont(bytes, family, typeface));
+    }
     // Insert emoji font before all other fallback fonts so we use the emoji
     // whenever it's available.
     if (family == 'Noto Color Emoji' || family == 'Noto Emoji') {

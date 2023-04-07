@@ -144,7 +144,7 @@ void testMain() {
 
       // Check that the contents of 'Ahem' is actually Roboto, because that's
       // what's specified in the manifest, and the manifest takes precedence.
-      expect(ahem.bytes.length, robotoData.lengthInBytes);
+      expect(ahem.bytes!.length, robotoData.lengthInBytes);
     });
 
     test('falls back to default Ahem URL', () async {
@@ -166,7 +166,7 @@ void testMain() {
 
       // Check that the contents of 'Ahem' is actually Roboto, because that's
       // what's specified in the manifest, and the manifest takes precedence.
-      expect(ahem.bytes.length, ahemData.lengthInBytes);
+      expect(ahem.bytes!.length, ahemData.lengthInBytes);
     });
 
     test('download fonts separately from registering', () async {

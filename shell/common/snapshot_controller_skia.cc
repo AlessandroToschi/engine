@@ -9,6 +9,7 @@
 #include "flutter/fml/trace_event.h"
 #include "flutter/shell/common/snapshot_controller.h"
 #include "third_party/skia/include/core/SkColorSpace.h"
+#include "fml/build_config.h"
 #include "third_party/skia/include/core/SkSurface.h"
 
 namespace flutter {
@@ -44,6 +45,38 @@ sk_sp<SkImage> DrawSnapshot(
   return nullptr;
 }
 }  // namespace
+
+sk_sp<DlImage> SnapshotControllerSkia::MakeFromTexture(int64_t raw_texture,
+                                                       SkISize size) {
+  GrBackendTexture texture;
+  SkColorType color_type;
+#ifdef FML_OS_ANDROID
+  // GL_RGBA8 0x8058_(OES)
+  uint32_t format = 0x8058;
+  // GL_TEXTURE_EXTERNAL_OES
+  uint32_t target = 0x8D65;
+  const GrGLTextureInfo texture_info{target, static_cast<GrGLuint>(raw_texture),
+                                     format};
+  texture = GrBackendTexture{size.width(), size.height(), GrMipMapped::kNo,
+                             texture_info};
+  color_type = SkColorType::kRGBA_8888_SkColorType;
+#elif FML_OS_IOS
+  GrMtlTextureInfo texture_info;
+  texture_info.fTexture =
+      sk_cfp<const void*>(reinterpret_cast<const void*>(raw_texture));
+  texture = GrBackendTexture{size.width(), size.height(), GrMipMapped::kNo,
+                             texture_info};
+  color_type = SkColorType::kBGRA_8888_SkColorType;
+#else
+  texture = GrBackendTexture();
+  color_type = kRGBA_8888_SkColorType;
+#endif
+  static const auto color_space = SkColorSpace::MakeSRGB();
+  const auto image = SkImage::MakeFromTexture(
+      GetDelegate().GetSurface()->GetContext(), texture,
+      kTopLeft_GrSurfaceOrigin, color_type, kPremul_SkAlphaType, color_space);
+  return sk_make_sp<DlImageSkia>(image);
+}
 
 sk_sp<DlImage> SnapshotControllerSkia::DoMakeRasterSnapshot(
     SkISize size,

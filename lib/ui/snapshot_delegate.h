@@ -56,6 +56,14 @@ class SnapshotDelegate {
       sk_sp<DisplayList> display_list,
       const SkImageInfo& image_info) = 0;
 
+  virtual std::unique_ptr<GpuImageResult> MakeSkiaGpuImageFromTexture(
+      int64_t raw_texture,
+      const SkISize& size) = 0;
+
+  virtual sk_sp<DlImage> MakeImpellerGpuImageFromTexture(
+      int64_t raw_texture,
+      const SkISize& size) = 0;
+
   //----------------------------------------------------------------------------
   /// @brief      Gets the registry of external textures currently in use by the
   ///             rasterizer. These textures may be updated at a cadence

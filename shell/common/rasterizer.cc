@@ -14,6 +14,7 @@
 #include "flutter/fml/time/time_delta.h"
 #include "flutter/fml/time/time_point.h"
 #include "flutter/shell/common/serialization_callbacks.h"
+#include "fml/build_config.h"
 #include "fml/make_copyable.h"
 #include "third_party/skia/include/core/SkColorSpace.h"
 #include "third_party/skia/include/core/SkData.h"
@@ -367,6 +368,53 @@ std::unique_ptr<Rasterizer::GpuImageResult> Rasterizer::MakeSkiaGpuImage(
   return result;
 }
 
+std::unique_ptr<Rasterizer::GpuImageResult>
+Rasterizer::MakeSkiaGpuImageFromTexture(int64_t raw_texture,
+                                        const SkISize& size) {
+  std::unique_ptr<SnapshotDelegate::GpuImageResult> result;
+  delegate_.GetIsGpuDisabledSyncSwitch()->Execute(
+      fml::SyncSwitch::Handlers()
+          .SetIfTrue([&] {
+            result = std::make_unique<SnapshotDelegate::GpuImageResult>(
+                GrBackendTexture(), nullptr, nullptr, "");
+          })
+          .SetIfFalse([&] {
+            const auto dlImage =
+                snapshot_controller_->MakeFromTexture(raw_texture, size);
+            if (dlImage && dlImage->skia_image()) {
+              result = std::make_unique<SnapshotDelegate::GpuImageResult>(
+                  GrBackendTexture(), nullptr, dlImage->skia_image(), "");
+            } else {
+              result = std::make_unique<SnapshotDelegate::GpuImageResult>(
+                  GrBackendTexture(), nullptr, nullptr, "");
+            }
+          }));
+  return result;
+}
+
+sk_sp<DlImage> Rasterizer::MakeImpellerGpuImageFromTexture(
+    int64_t raw_texture,
+    const SkISize& size) {
+#if defined(IMPELLER_SUPPORTS_RENDERING) && \
+    (defined(FML_OS_IOS) || defined(FML_OS_MACOSX))
+  sk_sp<flutter::DlImage> result;
+  delegate_.GetIsGpuDisabledSyncSwitch()->Execute(
+      fml::SyncSwitch::Handlers()
+          .SetIfTrue([&] { result = nullptr; })
+          .SetIfFalse([&] {
+            result = snapshot_controller_->MakeFromTexture(raw_texture, size);
+          }));
+  return result;
+#else
+  abort();
+#endif
+}
+
+std::unique_ptr<Surface> Rasterizer::MakeOffscreenSurface(int64_t raw_texture,
+                                                          const SkISize& size) {
+  return snapshot_controller_->MakeOffscreenSurface(raw_texture, size);
+}
+
 sk_sp<DlImage> Rasterizer::MakeRasterSnapshot(sk_sp<DisplayList> display_list,
                                               SkISize picture_size) {
   return snapshot_controller_->MakeRasterSnapshot(display_list, picture_size);
@@ -651,6 +699,73 @@ RasterStatus Rasterizer::DrawToSurfaceUnsafe(
   }
 
   return RasterStatus::kFailed;
+}
+
+RasterStatus Rasterizer::DrawLayerToSurface(
+    std::shared_ptr<flutter::LayerTree> layer_tree,
+    fml::RefPtr<RenderSurface> render_surface) {
+  RasterStatus raster_status;
+  delegate_.GetIsGpuDisabledSyncSwitch()->Execute(
+      fml::SyncSwitch::Handlers()
+          .SetIfTrue([&] { raster_status = RasterStatus::kDiscarded; })
+          .SetIfFalse([&] {
+            auto frame = render_surface->AcquireFrame(layer_tree->frame_size());
+            if (frame == nullptr) {
+              raster_status = RasterStatus::kFailed;
+              return;
+            }
+            SkMatrix root_surface_transformation = SkMatrix{};
+
+            const auto context_switch = surface_->MakeRenderContextCurrent();
+
+            auto canvas = frame->Canvas();
+
+#ifdef IMPELLER_SUPPORTS_RENDERING
+            if (delegate_.GetSettings().enable_impeller) {
+              canvas->Translate(0.0, render_surface->size().height());
+              canvas->Scale(1.0, -1.0);
+            }
+#endif
+
+            auto compositor_frame = compositor_context_->AcquireFrame(
+                surface_->GetContext(),       // skia GrContext
+                canvas,                       // root surface canvas
+                nullptr,                      // external view embedder
+                root_surface_transformation,  // root surface transformation
+                false,                        // instrumentation enabled
+                frame->framebuffer_info()
+                    .supports_readback,  // surface supports pixel reads
+                raster_thread_merger_,   // thread merger
+                frame->GetDisplayListBuilder().get(),  // display list builder
+                surface_->GetAiksContext().get()       // aiks context
+            );
+            if (compositor_frame) {
+              std::unique_ptr<FrameDamage> damage;
+              bool ignore_raster_cache = true;
+
+              raster_status = compositor_frame->Raster(
+                  *layer_tree,          // layer tree
+                  ignore_raster_cache,  // ignore raster cache
+                  nullptr               // frame damage
+              );
+              if (raster_status == RasterStatus::kFailed ||
+                  raster_status == RasterStatus::kSkipAndRetry) {
+                return;
+              }
+              frame->Submit();
+
+              if (surface_->GetContext()) {
+                surface_->GetContext()->flushAndSubmit(true);
+                surface_->GetContext()->performDeferredCleanup(
+                    kSkiaCleanupExpiration);
+              }
+
+              return;
+            }
+            raster_status = RasterStatus::kFailed;
+          }));
+
+  return raster_status;
 }
 
 static sk_sp<SkData> ScreenshotLayerTreeAsPicture(

@@ -257,14 +257,9 @@ FLUTTER_ASSERT_ARC
   CVBufferRelease(metalTexture);
 
   if (_enableImpeller) {
-    impeller::TextureDescriptor desc;
-    desc.storage_mode = impeller::StorageMode::kHostVisible;
-    desc.format = impeller::PixelFormat::kB8G8R8A8UNormInt;
-    desc.size = {textureSize.width(), textureSize.height()};
-    desc.mip_count = 1;
-    auto texture = impeller::TextureMTL::Wrapper(desc, rgbaTex);
-    texture->SetIntent(impeller::TextureIntent::kUploadFromHost);
-    return impeller::DlImageImpeller::Make(texture);
+    return [FlutterDarwinExternalTextureImpellerWrapper wrapRGBATexture:rgbaTex
+                                                                  width:textureSize.width()
+                                                                 height:textureSize.height()];
   }
 
   auto skImage = [FlutterDarwinExternalTextureSkImageWrapper wrapRGBATexture:rgbaTex
@@ -277,6 +272,23 @@ FLUTTER_ASSERT_ARC
 
   // This image should not escape local use by this flutter::Texture implementation
   return flutter::DlImage::Make(skImage);
+}
+
+@end
+
+@implementation FlutterDarwinExternalTextureImpellerWrapper
+
++ (sk_sp<flutter::DlImage>)wrapRGBATexture:(id<MTLTexture>)rgbaTex
+                                     width:(size_t)width
+                                    height:(size_t)height {
+  impeller::TextureDescriptor desc;
+  desc.storage_mode = impeller::StorageMode::kHostVisible;
+  desc.format = impeller::PixelFormat::kB8G8R8A8UNormInt;
+  desc.size = {(long)width, (long)height};
+  desc.mip_count = 1;
+  auto texture = impeller::TextureMTL::Wrapper(desc, rgbaTex);
+  texture->SetIntent(impeller::TextureIntent::kUploadFromHost);
+  return impeller::DlImageImpeller::Make(texture);
 }
 
 @end

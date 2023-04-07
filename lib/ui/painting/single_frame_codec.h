@@ -19,7 +19,8 @@ class SingleFrameCodec : public Codec {
  public:
   SingleFrameCodec(fml::RefPtr<ImageDescriptor> descriptor,
                    uint32_t target_width,
-                   uint32_t target_height);
+                   uint32_t target_height,
+                   bool mipmapped);
 
   ~SingleFrameCodec() override;
 
@@ -38,6 +39,7 @@ class SingleFrameCodec : public Codec {
   fml::RefPtr<ImageDescriptor> descriptor_;
   uint32_t target_width_;
   uint32_t target_height_;
+  bool mipmapped_;
   fml::RefPtr<CanvasImage> cached_image_;
   std::vector<DartPersistentValue> pending_callbacks_;
 

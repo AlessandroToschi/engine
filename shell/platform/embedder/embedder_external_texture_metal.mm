@@ -24,8 +24,11 @@ static bool ValidNumTextures(int expected, int actual) {
 }
 
 EmbedderExternalTextureMetal::EmbedderExternalTextureMetal(int64_t texture_identifier,
-                                                           const ExternalTextureCallback& callback)
-    : Texture(texture_identifier), external_texture_callback_(callback) {
+                                                           const ExternalTextureCallback& callback,
+                                                           bool enable_impeller)
+    : Texture(texture_identifier),
+      external_texture_callback_(callback),
+      enable_impeller_(enable_impeller) {
   FML_DCHECK(external_texture_callback_);
 }
 
@@ -62,6 +65,13 @@ sk_sp<DlImage> EmbedderExternalTextureMetal::ResolveTexture(int64_t texture_id,
 
   if (!texture) {
     return nullptr;
+  }
+
+  if (enable_impeller_) {
+    id<MTLTexture> rgbaTex = (__bridge id<MTLTexture>)texture->textures[0];
+    return [FlutterDarwinExternalTextureImpellerWrapper wrapRGBATexture:rgbaTex
+                                                                  width:size.width()
+                                                                 height:size.height()];
   }
 
   sk_sp<SkImage> image;

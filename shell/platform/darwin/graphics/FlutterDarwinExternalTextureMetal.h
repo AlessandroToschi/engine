@@ -10,6 +10,14 @@
 #include "third_party/skia/include/core/SkCanvas.h"
 #include "third_party/skia/include/core/SkImage.h"
 
+@interface FlutterDarwinExternalTextureImpellerWrapper : NSObject
+
++ (sk_sp<flutter::DlImage>)wrapRGBATexture:(nonnull id<MTLTexture>)rgbaTex
+                                     width:(size_t)width
+                                    height:(size_t)height;
+
+@end
+
 @interface FlutterDarwinExternalTextureSkImageWrapper : NSObject
 
 + (sk_sp<SkImage>)wrapYUVATexture:(nonnull id<MTLTexture>)yTex

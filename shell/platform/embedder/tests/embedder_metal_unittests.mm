@@ -513,7 +513,7 @@ TEST_F(EmbedderTest, ExternalTextureMetalRefreshedTooOften) {
     res->num_textures = 1;
     return res;
   });
-  EmbedderExternalTextureMetal texture(1, callback);
+  EmbedderExternalTextureMetal texture(1, callback, false);
 
   auto surface = TestMetalSurface::Create(*metal_context, SkISize::Make(100, 100));
   auto skia_surface = surface->GetSurface();

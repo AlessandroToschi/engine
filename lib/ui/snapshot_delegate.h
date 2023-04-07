@@ -9,6 +9,9 @@
 
 #include "flutter/common/graphics/texture.h"
 #include "flutter/display_list/display_list.h"
+#include "flutter/flow/layers/layer_tree.h"
+#include "flutter/flow/skia_gpu_object.h"
+#include "flutter/lib/ui/painting/render_surface.h"
 #include "third_party/skia/include/core/SkImage.h"
 #include "third_party/skia/include/core/SkPicture.h"
 #include "third_party/skia/include/gpu/GrBackendSurface.h"
@@ -55,6 +58,18 @@ class SnapshotDelegate {
       sk_sp<DisplayList> display_list,
       const SkImageInfo& image_info) = 0;
 
+  virtual std::unique_ptr<GpuImageResult> MakeSkiaGpuImageFromTexture(
+      int64_t raw_texture,
+      const SkISize& size) = 0;
+
+  virtual sk_sp<DlImage> MakeImpellerGpuImageFromTexture(
+      int64_t raw_texture,
+      const SkISize& size) = 0;
+
+  virtual std::unique_ptr<Surface> MakeOffscreenSurface(
+      int64_t raw_texture,
+      const SkISize& size) = 0;
+
   //----------------------------------------------------------------------------
   /// @brief      Gets the registry of external textures currently in use by the
   ///             rasterizer. These textures may be updated at a cadence
@@ -72,6 +87,10 @@ class SnapshotDelegate {
                                             SkISize picture_size) = 0;
 
   virtual sk_sp<SkImage> ConvertToRasterImage(sk_sp<SkImage> image) = 0;
+
+  virtual RasterStatus DrawLayerToSurface(
+      std::shared_ptr<flutter::LayerTree> layer_tree,
+      fml::RefPtr<RenderSurface> render_surface) = 0;
 };
 
 }  // namespace flutter

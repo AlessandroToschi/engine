@@ -30,6 +30,7 @@
 #include "flutter/lib/ui/painting/path_measure.h"
 #include "flutter/lib/ui/painting/picture.h"
 #include "flutter/lib/ui/painting/picture_recorder.h"
+#include "flutter/lib/ui/painting/render_surface.h"
 #include "flutter/lib/ui/painting/vertices.h"
 #include "flutter/lib/ui/semantics/semantics_update.h"
 #include "flutter/lib/ui/semantics/semantics_update_builder.h"
@@ -71,6 +72,8 @@ typedef CanvasPath Path;
 //   trying to resolve, an exception will be thrown.
 #define FFI_FUNCTION_LIST(V)                                          \
   /* Constructors */                                                  \
+  V(Image::CreateFromTextureID, 3)                                    \
+  V(Image::CreateFromTexturePointer, 3)                               \
   V(Canvas::Create, 6)                                                \
   V(ColorFilter::Create, 1)                                           \
   V(FragmentProgram::Create, 1)                                       \
@@ -82,6 +85,7 @@ typedef CanvasPath Path;
   V(PathMeasure::Create, 3)                                           \
   V(Path::Create, 1)                                                  \
   V(PictureRecorder::Create, 1)                                       \
+  V(RenderSurface::Create, 2)                                         \
   V(SceneBuilder::Create, 1)                                          \
   V(SemanticsUpdateBuilder::Create, 1)                                \
   /* Other */                                                         \
@@ -181,7 +185,7 @@ typedef CanvasPath Path;
   V(EngineLayer, dispose, 1)                           \
   V(FragmentProgram, initFromAsset, 2)                 \
   V(ReusableFragmentShader, Dispose, 1)                \
-  V(ReusableFragmentShader, SetImageSampler, 3)        \
+  V(ReusableFragmentShader, SetImageSampler, 4)        \
   V(ReusableFragmentShader, ValidateSamplers, 1)       \
   V(Gradient, initLinear, 6)                           \
   V(Gradient, initRadial, 8)                           \
@@ -195,7 +199,7 @@ typedef CanvasPath Path;
   V(ImageDescriptor, bytesPerPixel, 1)                 \
   V(ImageDescriptor, dispose, 1)                       \
   V(ImageDescriptor, height, 1)                        \
-  V(ImageDescriptor, instantiateCodec, 4)              \
+  V(ImageDescriptor, instantiateCodec, 5)              \
   V(ImageDescriptor, width, 1)                         \
   V(ImageFilter, initBlur, 4)                          \
   V(ImageFilter, initDilate, 3)                        \
@@ -272,6 +276,9 @@ typedef CanvasPath Path;
   V(Picture, dispose, 1)                               \
   V(Picture, toImage, 4)                               \
   V(Picture, toImageSync, 4)                           \
+  V(RenderSurface, setup, 4)                           \
+  V(RenderSurface, dispose, 2)                         \
+  V(RenderSurface, is_valid, 1)                        \
   V(SceneBuilder, addPerformanceOverlay, 6)            \
   V(SceneBuilder, addPicture, 5)                       \
   V(SceneBuilder, addPlatformView, 6)                  \
@@ -287,6 +294,7 @@ typedef CanvasPath Path;
   V(SceneBuilder, pushImageFilter, 4)                  \
   V(SceneBuilder, pushOffset, 5)                       \
   V(SceneBuilder, pushOpacity, 6)                      \
+  V(SceneBuilder, pushBlend, 7)                        \
   V(SceneBuilder, pushShaderMask, 10)                  \
   V(SceneBuilder, pushTransformHandle, 4)              \
   V(SceneBuilder, setCheckerboardOffscreenLayers, 2)   \
@@ -295,6 +303,7 @@ typedef CanvasPath Path;
   V(Scene, dispose, 1)                                 \
   V(Scene, toImage, 4)                                 \
   V(Scene, toImageSync, 4)                             \
+  V(Scene, renderToSurface, 4)                         \
   V(SemanticsUpdateBuilder, build, 2)                  \
   V(SemanticsUpdateBuilder, updateCustomAction, 5)     \
   V(SemanticsUpdateBuilder, updateNode, 36)            \

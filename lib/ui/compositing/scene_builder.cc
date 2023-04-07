@@ -5,6 +5,7 @@
 #include "flutter/lib/ui/compositing/scene_builder.h"
 
 #include "flutter/flow/layers/backdrop_filter_layer.h"
+#include "flutter/flow/layers/blend_layer.h"
 #include "flutter/flow/layers/clip_path_layer.h"
 #include "flutter/flow/layers/clip_rect_layer.h"
 #include "flutter/flow/layers/clip_rrect_layer.h"
@@ -128,6 +129,23 @@ void SceneBuilder::pushOpacity(Dart_Handle layer_handle,
                                const fml::RefPtr<EngineLayer>& oldLayer) {
   auto layer = std::make_shared<flutter::OpacityLayer>(
       alpha, SkPoint::Make(SafeNarrow(dx), SafeNarrow(dy)));
+  PushLayer(layer);
+  EngineLayer::MakeRetained(layer_handle, layer);
+
+  if (oldLayer && oldLayer->Layer()) {
+    layer->AssignOldLayer(oldLayer->Layer().get());
+  }
+}
+
+void SceneBuilder::pushBlend(Dart_Handle layer_handle,
+                             int alpha,
+                             double dx,
+                             double dy,
+                             int blendMode,
+                             fml::RefPtr<EngineLayer> oldLayer) {
+  auto layer = std::make_shared<flutter::BlendLayer>(
+      alpha, SkPoint::Make((SkScalar)dx, (SkScalar)dy),
+      static_cast<DlBlendMode>(blendMode));
   PushLayer(layer);
   EngineLayer::MakeRetained(layer_handle, layer);
 

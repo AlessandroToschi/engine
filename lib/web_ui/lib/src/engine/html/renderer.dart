@@ -168,7 +168,7 @@ class HtmlRenderer implements Renderer {
     Uint8List list, {
     int? targetWidth,
     int? targetHeight,
-    bool allowUpscaling = true}) async {
+    bool allowUpscaling = true, mipmapped = true,}) async {
     final DomBlob blob = createDomBlob(<dynamic>[list.buffer]);
     return HtmlBlobCodec(blob);
   }

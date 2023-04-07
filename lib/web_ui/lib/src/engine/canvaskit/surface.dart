@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 
 import 'dart:js_interop';
+import 'dart:typed_data';
 
 import 'package:ui/ui.dart' as ui;
 
@@ -14,6 +15,8 @@ import '../util.dart';
 import '../window.dart';
 import 'canvas.dart';
 import 'canvaskit_api.dart';
+import 'image.dart';
+import 'native_memory.dart';
 import 'renderer.dart';
 import 'surface_factory.dart';
 import 'util.dart';
@@ -81,6 +84,8 @@ class Surface {
   SkGrContext? _grContext;
   int? _glContext;
   int? _skiaCacheBytes;
+
+  SkGrContext? get grContext => _grContext;
 
   /// The root HTML element for this surface.
   ///
@@ -494,4 +499,81 @@ class CkSurface {
   }
 
   bool _isDisposed = false;
+}
+
+class CkRenderSurface implements ui.RenderSurface {
+  CkRenderSurface(this.texture, this.width, this.height, this.isExport) {
+    _ref = UniqueRef<SkSurface>(this, setup(width, height), 'CkRenderSurface');
+  }
+
+  @override
+  int height;
+
+  @override
+  bool isExport;
+
+  @override
+  Object texture;
+
+  @override
+  int width;
+
+  SkGrContext? _grContext;
+
+  late UniqueRef<SkSurface> _ref;
+
+  @override
+  SkSurface get skiaObject => _ref.nativeObject;
+
+  static Future<ui.RenderSurface> fromTexture(Object textureId, int width, int height, { bool isExport = false }) async {
+    // Setup is run via createDefault in the parent constructor
+    return CkRenderSurface(textureId, width, height, isExport);
+  }
+
+  @override
+  SkSurface setup(int width, int height) {
+    final surface = isExport ? SurfaceFactory.instance.pictureToImageSurface : SurfaceFactory.instance.baseSurface;
+    final SkGrContext? grContext = surface.grContext;
+    if (grContext == null) {
+      throw Exception('No grContext from baseSurface when setting up RenderSurface (isExport: $isExport).');
+    }
+
+    _grContext = grContext;
+    final SkSurface? skSurface = canvasKit.MakeRenderTarget(grContext, width, height);
+
+    if (skSurface == null) {
+      throw Exception('Failed to create GPU-backed SkSurface for RenderSurface');
+    }
+
+    return skSurface;
+  }
+
+  @override
+  void toBytes(ByteBuffer buffer) {
+    final SkGrContext? grContext = SurfaceFactory.instance.baseSurface.grContext;
+    if (grContext == null) {
+      throw Exception('No grContext from baseSurface when setting up RenderSurface.');
+    }
+    skiaObject.readPixelsGL(buffer.asUint8List(), grContext);
+  }
+
+  ui.Image? makeImageSnapshotFromSource(Object src) {
+    // TODO: patchy workaround, fix firing onchange from surface update if possible
+    final SkGrContext? currContext = SurfaceFactory.instance.baseSurface.grContext;
+    if (_grContext != currContext) {
+      skiaObject.delete();
+      _ref = UniqueRef<SkSurface>(this, setup(width, height), 'CkRenderSurface');
+      _grContext = currContext;
+    }
+
+    skiaObject.updateFromSource(src, width, height, false);
+    skiaObject.flush();
+    return CkImage(skiaObject.makeImageSnapshot());
+  }
+
+  @override
+  Future<void> dispose() async {
+    skiaObject.delete();
+    _ref.dispose();
+  }
 }

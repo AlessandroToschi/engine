@@ -33,6 +33,14 @@ std::shared_ptr<TextureMTL> TextureMTL::Wrapper(TextureDescriptor desc,
   return std::make_shared<TextureMTL>(desc, texture, true);
 }
 
+std::shared_ptr<TextureMTL> TextureMTL::TexturePointerWrapper(
+    TextureDescriptor desc,
+    int64_t texture_pointer) {
+  id<MTLTexture> texture =
+      (__bridge id)(reinterpret_cast<void*>(texture_pointer));
+  return TextureMTL::Wrapper(desc, texture);
+}
+
 TextureMTL::~TextureMTL() = default;
 
 void TextureMTL::SetLabel(std::string_view label) {

@@ -1674,6 +1674,34 @@ class Image {
     onCreate?.call(this);
   }
 
+  factory Image.fromTextureID({
+    required int textureId,
+    required int width,
+    required int height
+  }) => Image._(
+    _Image.createFromTextureId(
+      textureId,
+      width,
+      height
+    ),
+    width,
+    height,
+  );
+
+  factory Image.fromTexturePointer({
+    required int texturePointer,
+    required int width,
+    required int height
+  }) => Image._(
+    _Image.createFromTexturePointer(
+      texturePointer,
+      width,
+      height
+    ),
+    width,
+    height,
+  );
+
   // C++ unit tests access this.
   @pragma('vm:entry-point')
   final _Image _image;
@@ -1691,6 +1719,8 @@ class Image {
   /// than to use [onDispose] directly because [MemoryAllocations]
   /// allows multiple callbacks.
   static ImageEventCallback? onDispose;
+
+  void Function()? disposeCallback;
 
   StackTrace? _debugStack;
 
@@ -1719,6 +1749,7 @@ class Image {
     final bool removed = _image._handles.remove(this);
     assert(removed);
     if (_image._handles.isEmpty) {
+      disposeCallback?.call();
       _image.dispose();
     }
   }
@@ -1851,7 +1882,9 @@ class Image {
       );
     }
     assert(!_image._disposed);
-    return Image._(_image, width, height);
+    final Image image = Image._(_image, width, height);
+    image.disposeCallback = disposeCallback;
+    return image;
   }
 
   /// Returns true if `other` is a [clone] of this and thus shares the same
@@ -1878,6 +1911,12 @@ class _Image extends NativeFieldWrapperClass1 {
   // use the ImageDescriptor API.
   @pragma('vm:entry-point')
   _Image._();
+
+  @FfiNative<Handle Function(Int64, Int32, Int32)>('Image::CreateFromTextureID')
+  external static _Image createFromTextureId(int textureId, int width, int height);
+
+  @FfiNative<Handle Function(Int64, Int32, Int32)>('Image::CreateFromTexturePointer')
+  external static _Image createFromTexturePointer(int texturePointer, int width, int height);
 
   @FfiNative<Int32 Function(Pointer<Void>)>('Image::width', isLeaf: true)
   external int get width;

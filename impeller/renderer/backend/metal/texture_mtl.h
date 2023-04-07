@@ -24,6 +24,10 @@ class TextureMTL final : public Texture,
       id<MTLTexture> texture,
       std::function<void()> deletion_proc = nullptr);
 
+  static std::shared_ptr<TextureMTL> TexturePointerWrapper(
+      TextureDescriptor desc,
+      int64_t texture_pointer);
+
   // |Texture|
   ~TextureMTL() override;
 

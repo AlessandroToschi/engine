@@ -61,14 +61,12 @@ class SkiaFontCollection implements FlutterFontCollection {
     familyToFontMap.clear();
 
     for (final RegisteredFont font in _registeredFonts) {
-      _fontProvider!.registerFont(font.bytes, font.family);
-      familyToFontMap
-          .putIfAbsent(font.family, () => <SkFont>[])
-          .add(SkFont(font.typeface));
-    }
+      if (apiHasRegisterFontFromTypeface) {
+        _fontProvider!.registerFontFromTypeface(font.typeface, font.family);
+      } else {
+        _fontProvider!.registerFont(font.bytes!, font.family);
+      }
 
-    for (final RegisteredFont font in registeredFallbackFonts) {
-      _fontProvider!.registerFont(font.bytes, font.family);
       familyToFontMap
           .putIfAbsent(font.family, () => <SkFont>[])
           .add(SkFont(font.typeface));
@@ -91,7 +89,12 @@ class SkiaFontCollection implements FlutterFontCollection {
     final SkTypeface? typeface =
         canvasKit.Typeface.MakeFreeTypeFaceFromData(list.buffer);
     if (typeface != null) {
-      _registeredFonts.add(RegisteredFont(list, fontFamily, typeface));
+      if (apiHasRegisterFontFromTypeface) {
+        _registeredFonts.add(RegisteredFont(null, fontFamily, typeface));
+      } else {
+        _registeredFonts.add(RegisteredFont(list, fontFamily, typeface));
+      }
+
       _registerWithFontProvider();
     } else {
       printWarning('Failed to parse font family "$fontFamily"');
@@ -160,7 +163,11 @@ class SkiaFontCollection implements FlutterFontCollection {
       final SkTypeface? typeface =
           canvasKit.Typeface.MakeFreeTypeFaceFromData(bytes.buffer);
       if (typeface != null) {
-        return RegisteredFont(bytes, family, typeface);
+        if (apiHasRegisterFontFromTypeface) {
+          return RegisteredFont(null, family, typeface);
+        } else {
+          return RegisteredFont(bytes, family, typeface);
+        }
       } else {
         printWarning('Failed to load font $family at $url');
         printWarning('Verify that $url contains a valid font.');
@@ -243,7 +250,7 @@ class RegisteredFont {
   final String family;
 
   /// The byte data for this font.
-  final Uint8List bytes;
+  final Uint8List? bytes;
 
   /// The [SkTypeface] created from this font's [bytes].
   ///

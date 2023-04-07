@@ -41,6 +41,8 @@ class SnapshotController {
 
   virtual sk_sp<SkImage> ConvertToRasterImage(sk_sp<SkImage> image) = 0;
 
+  virtual sk_sp<DlImage> MakeFromTexture(int64_t raw_texture, SkISize size) = 0;
+
  protected:
   explicit SnapshotController(const Delegate& delegate);
   const Delegate& GetDelegate() { return delegate_; }

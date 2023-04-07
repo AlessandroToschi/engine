@@ -14,6 +14,7 @@
 #include "flutter/fml/time/time_delta.h"
 #include "flutter/fml/time/time_point.h"
 #include "flutter/shell/common/serialization_callbacks.h"
+#include "fml/build_config.h"
 #include "fml/make_copyable.h"
 #include "third_party/skia/include/core/SkImageEncoder.h"
 #include "third_party/skia/include/core/SkPictureRecorder.h"
@@ -355,6 +356,25 @@ std::unique_ptr<Rasterizer::GpuImageResult> Rasterizer::MakeSkiaGpuImage(
                 texture, sk_ref_sp(context), nullptr, "");
           }));
   return result;
+}
+
+std::unique_ptr<Rasterizer::GpuImageResult>
+Rasterizer::MakeSkiaGpuImageFromTexture(int64_t raw_texture,
+                                        const SkISize& size) {
+  const auto dlImage = snapshot_controller_->MakeFromTexture(raw_texture, size);
+
+  return std::make_unique<SnapshotDelegate::GpuImageResult>(
+      GrBackendTexture(), nullptr, dlImage->skia_image(), "");
+}
+
+sk_sp<DlImage> Rasterizer::MakeImpellerGpuImageFromTexture(
+    int64_t raw_texture,
+    const SkISize& size) {
+#if defined(IMPELLER_SUPPORTS_RENDERING) && defined(FML_OS_IOS)
+  return snapshot_controller_->MakeFromTexture(raw_texture, size);
+#else
+  abort();
+#endif
 }
 
 sk_sp<DlImage> Rasterizer::MakeRasterSnapshot(sk_sp<DisplayList> display_list,

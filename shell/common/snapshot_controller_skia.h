@@ -20,6 +20,8 @@ class SnapshotControllerSkia : public SnapshotController {
 
   virtual sk_sp<SkImage> ConvertToRasterImage(sk_sp<SkImage> image) override;
 
+  sk_sp<DlImage> MakeFromTexture(int64_t raw_texture, SkISize size) override;
+
  private:
   sk_sp<DlImage> DoMakeRasterSnapshot(
       SkISize size,

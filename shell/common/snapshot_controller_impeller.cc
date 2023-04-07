@@ -15,6 +15,19 @@
 
 namespace flutter {
 
+sk_sp<DlImage> SnapshotControllerImpeller::MakeFromTexture(int64_t raw_texture,
+                                                           SkISize size) {
+  impeller::AiksContext* context = GetDelegate().GetSurface()->GetAiksContext();
+  impeller::TextureDescriptor desc;
+  desc.storage_mode = impeller::StorageMode::kHostVisible;
+  desc.format = impeller::PixelFormat::kB8G8R8A8UNormInt;
+  desc.size = {size.width(), size.height()};
+  desc.mip_count = 1;
+  auto texture = context->GetContext()->GetResourceAllocator()->WrapTexture(
+      desc, raw_texture);
+  return impeller::DlImageImpeller::Make(texture);
+}
+
 sk_sp<DlImage> SnapshotControllerImpeller::MakeRasterSnapshot(
     sk_sp<DisplayList> display_list,
     SkISize size) {

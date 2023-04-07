@@ -318,6 +318,43 @@ class CkFragmentProgram implements ui.FragmentProgram {
       throw const FormatException('Invalid Shader Source');
     }
 
+    final List<UniformData> uniforms = List<UniformData>.filled(rawUniforms.length, UniformData.empty);
+
+    int textureCount = 0;
+    int floatCount = 0;
+    for (int i = 0; i < rawUniforms.length; i += 1) {
+      final Object? rawUniformData = rawUniforms[i];
+      if (rawUniformData is! Map<String, Object?>) {
+        throw const FormatException('Invalid Shader Data');
+      }
+      final Object? name = rawUniformData['name'];
+      final Object? location = rawUniformData['location'];
+      final Object? rawType = rawUniformData['type'];
+      if (name is! String || location is! int || rawType is! int) {
+        throw const FormatException('Invalid Shader Data');
+      }
+      final UniformType? type = uniformTypeFromJson(rawType);
+      if (type == null) {
+        throw const FormatException('Invalid Shader Data');
+      }
+      if (type == UniformType.SampledImage) {
+        textureCount += 1;
+      } else {
+        final Object? rows = rawUniformData['rows'];
+        final Object? columns = rawUniformData['columns'];
+        final Object? bitWidth = rawUniformData['bit_width'];
+
+        if (bitWidth is! int || rows is! int || columns is! int) {
+          throw const FormatException('Invalid Shader Data');
+        }
+        floatCount += (bitWidth  ~/ 32) * rows * columns;
+      }
+      uniforms[location] = UniformData(
+        name: name,
+        location: location,
+        type: type,
+      );
+    }
     return CkFragmentProgram(
       name,
       effect,
@@ -379,11 +416,10 @@ class CkFragmentShader implements ui.FragmentShader, CkShader {
   }
 
   @override
-  void setImageSampler(int index, ui.Image image) {
-    assert(!_debugDisposed, 'FragmentShader has been disposed of.');
+  void setImageSampler(int index, ui.Image image, {ui.FilterQuality filterQuality = ui.FilterQuality.none}) {
     final ui.ImageShader sampler = ui.ImageShader(image, ui.TileMode.clamp,
-        ui.TileMode.clamp, toMatrix64(Matrix4.identity().storage));
-    samplers[index] = (sampler as CkShader).getSkShader(ui.FilterQuality.none);
+        ui.TileMode.clamp, toMatrix64(Matrix4.identity().storage), filterQuality: filterQuality,);
+    samplers[index] = (sampler as CkShader).skiaObject;
     setFloat(lastFloatIndex + 2 * index, (sampler as CkImageShader).imageWidth.toDouble());
     setFloat(lastFloatIndex + 2 * index + 1, sampler.imageHeight.toDouble());
   }

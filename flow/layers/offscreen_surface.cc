@@ -72,6 +72,7 @@ OffscreenSurface::OffscreenSurface(GrDirectContext* surface_context,
   if (offscreen_surface_) {
     adapter_.set_canvas(offscreen_surface_->getCanvas());
   }
+  size_ = size;
 }
 
 sk_sp<SkData> OffscreenSurface::GetRasterData(bool compressed) const {

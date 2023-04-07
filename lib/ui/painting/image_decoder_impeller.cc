@@ -288,7 +288,7 @@ DecompressResult ImageDecoderImpeller::DecompressTexture(
 static std::pair<sk_sp<DlImage>, std::string> UnsafeUploadTextureToPrivate(
     const std::shared_ptr<impeller::Context>& context,
     const std::shared_ptr<impeller::DeviceBuffer>& buffer,
-    const SkImageInfo& image_info) {
+    const SkImageInfo& image_info, bool mipmapped) {
   const auto pixel_format =
       impeller::skia_conversions::ToPixelFormat(image_info.colorType());
   if (!pixel_format) {
@@ -302,7 +302,8 @@ static std::pair<sk_sp<DlImage>, std::string> UnsafeUploadTextureToPrivate(
   texture_descriptor.storage_mode = impeller::StorageMode::kDevicePrivate;
   texture_descriptor.format = pixel_format.value();
   texture_descriptor.size = {image_info.width(), image_info.height()};
-  texture_descriptor.mip_count = texture_descriptor.size.MipCount();
+  texture_descriptor.mip_count =
+      mipmapped ? texture_descriptor.size.MipCount() : 1u;
   texture_descriptor.compression_type = impeller::CompressionType::kLossy;
 
   auto dest_texture =
@@ -334,7 +335,7 @@ static std::pair<sk_sp<DlImage>, std::string> UnsafeUploadTextureToPrivate(
   }
   blit_pass->SetLabel("Mipmap Blit Pass");
   blit_pass->AddCopy(buffer->AsBufferView(), dest_texture);
-  if (texture_descriptor.size.MipCount() > 1) {
+  if (mipmapped && texture_descriptor.size.MipCount() > 1) {
     blit_pass->GenerateMipmap(dest_texture);
   }
 
@@ -355,7 +356,7 @@ ImageDecoderImpeller::UploadTextureToPrivate(
     const std::shared_ptr<impeller::DeviceBuffer>& buffer,
     const SkImageInfo& image_info,
     const std::shared_ptr<SkBitmap>& bitmap,
-    const std::shared_ptr<fml::SyncSwitch>& gpu_disabled_switch) {
+    const std::shared_ptr<fml::SyncSwitch>& gpu_disabled_switch, bool mipmapped) {
   TRACE_EVENT0("impeller", __FUNCTION__);
   if (!context) {
     return std::make_pair(nullptr, "No Impeller context is available");
@@ -367,8 +368,9 @@ ImageDecoderImpeller::UploadTextureToPrivate(
   std::pair<sk_sp<DlImage>, std::string> result;
   gpu_disabled_switch->Execute(
       fml::SyncSwitch::Handlers()
-          .SetIfFalse([&result, context, buffer, image_info] {
-            result = UnsafeUploadTextureToPrivate(context, buffer, image_info);
+          .SetIfFalse([&result, context, buffer, image_info, mipmapped] {
+            result = UnsafeUploadTextureToPrivate(context, buffer, image_info,
+                                                  mipmapped);
           })
           .SetIfTrue([&result, context, bitmap, gpu_disabled_switch] {
             // create_mips is false because we already know the GPU is disabled.
@@ -478,6 +480,7 @@ ImageDecoderImpeller::UploadTextureToStorage(
 void ImageDecoderImpeller::Decode(fml::RefPtr<ImageDescriptor> descriptor,
                                   uint32_t target_width,
                                   uint32_t target_height,
+                                  bool mipmapped,
                                   const ImageResult& p_result) {
   FML_DCHECK(descriptor);
   FML_DCHECK(p_result);
@@ -502,7 +505,7 @@ void ImageDecoderImpeller::Decode(fml::RefPtr<ImageDescriptor> descriptor,
        io_runner = runners_.GetIOTaskRunner(),                    //
        result,
        supports_wide_gamut = supports_wide_gamut_,  //
-       gpu_disabled_switch = gpu_disabled_switch_]() {
+       gpu_disabled_switch = gpu_disabled_switch_, mipmapped]() {
         if (!context) {
           result(nullptr, "No Impeller context is available");
           return;
@@ -519,14 +522,14 @@ void ImageDecoderImpeller::Decode(fml::RefPtr<ImageDescriptor> descriptor,
           return;
         }
         auto upload_texture_and_invoke_result = [result, context, bitmap_result,
-                                                 gpu_disabled_switch]() {
+                                                 gpu_disabled_switch, mipmapped]() {
           sk_sp<DlImage> image;
           std::string decode_error;
           if (!kShouldUseMallocDeviceBuffer &&
               context->GetCapabilities()->SupportsBufferToTextureBlits()) {
             std::tie(image, decode_error) = UploadTextureToPrivate(
                 context, bitmap_result.device_buffer, bitmap_result.image_info,
-                bitmap_result.sk_bitmap, gpu_disabled_switch);
+                bitmap_result.sk_bitmap, gpu_disabled_switch, mipmapped);
             result(image, decode_error);
           } else {
             std::tie(image, decode_error) = UploadTextureToStorage(

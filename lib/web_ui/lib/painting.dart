@@ -866,11 +866,98 @@ abstract class FragmentProgram {
 abstract class FragmentShader implements Shader {
   void setFloat(int index, double value);
 
-  void setImageSampler(int index, Image image);
+  void setImageSampler(int index, Image image, {FilterQuality filterQuality = FilterQuality.none});
 
   @override
   void dispose();
 
   @override
   bool get debugDisposed;
+}
+
+class RenderSurface extends engine.ManagedSkiaObject<engine.SkSurface> {
+  final Object texture;
+  final int width;
+  final int height;
+  final bool isExport;
+  engine.SkGrContext? _grContext;
+
+  RenderSurface._(this.texture, this.width, this.height, this.isExport);
+
+  static Future<RenderSurface> fromTexture(Object textureId, int width, int height, { bool isExport = false }) async {
+    // Setup is run via createDefault in the parent constructor
+    return RenderSurface._(textureId, width, height, isExport);
+  }
+
+  @override
+  bool get isResurrectionExpensive => true;
+
+  engine.SkSurface setup(int width, int height) {
+    final surface = isExport ? engine.SurfaceFactory.instance.pictureToImageSurface : engine.SurfaceFactory.instance.baseSurface;
+    final engine.SkGrContext? grContext = surface.grContext;
+    if (grContext == null) {
+      throw Exception('No grContext from baseSurface when setting up RenderSurface (isExport: $isExport).');
+    }
+
+    _grContext = grContext;
+    final engine.SkSurface? skSurface = engine.canvasKit.MakeRenderTarget(grContext, width, height);
+
+    if (skSurface == null) {
+      throw Exception('Failed to create GPU-backed SkSurface for RenderSurface');
+    }
+
+    return skSurface;
+  }
+
+  void toBytes(ByteBuffer buffer) {
+    if (rawSkiaObject == null) {
+      throw Exception('Failed to create GPU-backed SkSurface for RenderSurface');
+    }
+    final engine.SkGrContext? grContext = engine.SurfaceFactory.instance.baseSurface.grContext;
+    if (grContext == null) {
+      throw Exception('No grContext from baseSurface when setting up RenderSurface.');
+    }
+    rawSkiaObject!.readPixelsGL(buffer.asUint8List(), grContext);
+  }
+
+  Image? makeImageSnapshotFromSource(Object src) {
+    if (rawSkiaObject == null) {
+      print("RenderSurface's SkiaSurface is not ready when making image from source.");
+      return null;
+    }
+
+    // TODO: patchy workaround, fix firing onchange from surface update if possible
+    final engine.SkGrContext? currContext = engine.SurfaceFactory.instance.baseSurface.grContext;
+    if (_grContext != currContext) {
+      delete();
+      rawSkiaObject = setup(width, height);
+      _grContext = currContext;
+    }
+
+    rawSkiaObject!.updateFromSource(src, width, height, false);
+    rawSkiaObject!.flush();
+    return engine.CkImage(rawSkiaObject!.makeImageSnapshot());
+  }
+
+  // SkSurface.dispose doesn't do anything for GPU-backed surfaces
+  Future<void> dispose() async { }
+
+  int rawTexture() {
+    throw UnimplementedError();
+  }
+
+  @override
+  engine.SkSurface createDefault() {
+    return setup(width, height);
+  }
+
+  @override
+  void delete() {
+    rawSkiaObject?.delete();
+  }
+
+  @override
+  engine.SkSurface resurrect() {
+    return createDefault();
+  }
 }

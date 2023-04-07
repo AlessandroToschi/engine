@@ -253,6 +253,70 @@ RenderTarget RenderTarget::CreateOffscreen(
   return target;
 }
 
+std::shared_ptr<RenderTarget> RenderTarget::CreateOffscreenFromTexture(
+    int64_t raw_texture,
+    const Context& context,
+    ISize size,
+    const std::string& label,
+    StorageMode color_storage_mode,
+    LoadAction color_load_action,
+    StoreAction color_store_action,
+    StorageMode stencil_storage_mode,
+    LoadAction stencil_load_action,
+    StoreAction stencil_store_action) {
+  if (size.IsEmpty()) {
+    return {};
+  }
+
+  TextureDescriptor stencil_tex0;
+  stencil_tex0.storage_mode = stencil_storage_mode;
+  stencil_tex0.format = PixelFormat::kS8UInt;
+  stencil_tex0.size = size;
+  stencil_tex0.usage =
+      static_cast<TextureUsageMask>(TextureUsage::kRenderTarget);
+
+  impeller::TextureDescriptor desc;
+  desc.storage_mode = impeller::StorageMode::kHostVisible;
+  desc.format = impeller::PixelFormat::kB8G8R8A8UNormInt;
+  desc.size = size;
+  desc.mip_count = 1;
+  desc.usage = static_cast<uint64_t>(TextureUsage::kRenderTarget) |
+               static_cast<uint64_t>(TextureUsage::kShaderRead) |
+               static_cast<uint64_t>(TextureUsage::kShaderWrite);
+
+  ColorAttachment color0;
+  color0.clear_color = Color::BlackTransparent();
+  color0.load_action = color_load_action;
+  color0.store_action = color_store_action;
+  color0.texture =
+      context.GetResourceAllocator()->WrapTexture(desc, raw_texture);
+
+  if (!color0.texture) {
+    return {};
+  }
+
+  color0.texture->SetLabel(SPrintF("%s Color Texture", label.c_str()));
+
+  StencilAttachment stencil0;
+  stencil0.load_action = stencil_load_action;
+  stencil0.store_action = stencil_store_action;
+  stencil0.clear_stencil = 0u;
+  stencil0.texture =
+      context.GetResourceAllocator()->CreateTexture(stencil_tex0);
+
+  if (!stencil0.texture) {
+    return {};
+  }
+
+  stencil0.texture->SetLabel(SPrintF("%s Stencil Texture", label.c_str()));
+
+  auto target = std::make_shared<RenderTarget>();
+  target->SetColorAttachment(color0, 0u);
+  target->SetStencilAttachment(std::move(stencil0));
+
+  return target;
+}
+
 RenderTarget RenderTarget::CreateOffscreenMSAA(
     const Context& context,
     ISize size,

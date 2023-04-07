@@ -379,6 +379,49 @@ class TransformEngineLayer extends ContainerLayer
   }
 }
 
+/// A layer that paints its children with the given opacity and blend.
+class BlendEngineLayer extends ContainerLayer
+    implements ui.BlendEngineLayer {
+  final int _alpha;
+  final ui.BlendMode _blendMode;
+  final ui.Offset _offset;
+
+  BlendEngineLayer(this._alpha, this._blendMode, this._offset);
+
+  @override
+  void preroll(PrerollContext prerollContext, Matrix4 matrix) {
+    final Matrix4 childMatrix = Matrix4.copy(matrix);
+    childMatrix.translate(_offset.dx, _offset.dy);
+    prerollContext.mutatorsStack
+        .pushTransform(Matrix4.translationValues(_offset.dx, _offset.dy, 0.0));
+    prerollContext.mutatorsStack.pushOpacity(_alpha);
+    super.preroll(prerollContext, childMatrix);
+    prerollContext.mutatorsStack.pop();
+    prerollContext.mutatorsStack.pop();
+    paintBounds = paintBounds.translate(_offset.dx, _offset.dy);
+  }
+
+  @override
+  void paint(PaintContext paintContext) {
+    assert(needsPainting);
+
+    final CkPaint paint = CkPaint();
+    paint.color = ui.Color.fromARGB(_alpha, 0, 0, 0);
+    paint.blendMode = _blendMode;
+
+    paintContext.internalNodesCanvas.save();
+    paintContext.internalNodesCanvas.translate(_offset.dx, _offset.dy);
+
+    final ui.Rect saveLayerBounds = paintBounds.shift(-_offset);
+
+    paintContext.internalNodesCanvas.saveLayer(saveLayerBounds, paint);
+    paintChildren(paintContext);
+    // Restore twice: once for the translate and once for the saveLayer.
+    paintContext.internalNodesCanvas.restore();
+    paintContext.internalNodesCanvas.restore();
+  }
+}
+
 /// Translates its children along x and y coordinates.
 ///
 /// This is a thin wrapper over [TransformEngineLayer] just so the framework

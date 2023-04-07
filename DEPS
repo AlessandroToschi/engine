@@ -16,6 +16,7 @@ vars = {
   'github_git': 'https://github.com',
   'skia_git': 'https://skia.googlesource.com',
   'llvm_git': 'https://llvm.googlesource.com',
+  'clay_skia_git': 'https://github.com/plexagon',
   # OCMock is for testing only so there is no google clone
   'ocmock_git': 'https://github.com/erikdoe/ocmock.git',
   'skia_revision': 'd097852dc9287afb10e5222c4e2a675703d8dac3',
@@ -28,7 +29,7 @@ vars = {
   # This prevents us from downloading the Emscripten toolchain for builds
   # which do not build for the web. This toolchain is needed to build CanvasKit
   # for the web engine.
-  'download_emsdk': False,
+  'download_emsdk': True,
 
   # For experimental features some dependencies may only be avaialable in the master/main
   # channels. This variable is being set when CI is checking out the repository.
@@ -585,7 +586,7 @@ deps = {
    Var('dart_git') + '/root_certificates.git' + '@' + Var('dart_root_certificates_rev'),
 
   'src/third_party/skia':
-   Var('skia_git') + '/skia.git' + '@' +  Var('skia_revision'),
+   'git@github.com:plexagon/skia.git' + '@' +  Var('skia_revision'),
 
   'src/third_party/ocmock':
    Var('ocmock_git') + '@' +  Var('ocmock_rev'),

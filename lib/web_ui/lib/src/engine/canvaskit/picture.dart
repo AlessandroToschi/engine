@@ -96,12 +96,23 @@ class CkPicture implements ScenePicture {
   }
 
   @override
-  CkImage toImageSync(int width, int height) {
-    assert(debugCheckNotDisposed('Cannot convert picture to image.'));
-
+  Future<Object?> toCanvas(int width, int height) async {
     final Surface surface = SurfaceFactory.instance.pictureToImageSurface;
     final CkSurface ckSurface = surface
         .createOrUpdateSurface(ui.Size(width.toDouble(), height.toDouble()));
+    final CkCanvas ckCanvas = ckSurface.getCanvas();
+    ckCanvas.clear(const ui.Color(0x00000000));
+    ckCanvas.drawPicture(this);
+    ckSurface.surface.flush();
+    return surface.htmlCanvas;
+  }
+
+  CkImage toImageSync(int width, int height) {
+    assert(debugCheckNotDisposed('Cannot convert picture to image.'));
+
+    final Surface surface = SurfaceFactory.instance.baseSurface;
+    final CkSurface ckSurface =
+      surface.createRenderTargetSurface(ui.Size(width.toDouble(), height.toDouble()));
     final CkCanvas ckCanvas = ckSurface.getCanvas();
     ckCanvas.clear(const ui.Color(0x00000000));
     ckCanvas.drawPicture(this);
@@ -119,6 +130,26 @@ class CkPicture implements ScenePicture {
     if (rasterImage == null) {
       throw StateError('Unable to convert image pixels into SkImage.');
     }
+    ckSurface.dispose();
     return CkImage(rasterImage);
+  }
+
+  @override
+  Future<void> renderToSurface(ui.RenderSurface renderSurface, {bool flipVertical = false}) async {
+    if (renderSurface.rawSkiaObject== null) {
+      throw Exception('Render surface not initialized');
+    }
+
+    final SkCanvas canvas = renderSurface.rawSkiaObject!.getCanvas();
+    canvas.save();
+
+    if (flipVertical) {
+      canvas.translate(0, renderSurface.height.toDouble());
+      canvas.scale(1, -1);
+    }
+
+    canvas.drawPicture(rawSkiaObject!);
+    canvas.restore();
+    renderSurface.rawSkiaObject!.flush();
   }
 }

@@ -70,6 +70,8 @@ typedef CanvasPath Path;
 //   trying to resolve, an exception will be thrown.
 #define FFI_FUNCTION_LIST(V)                                          \
   /* Constructors */                                                  \
+  V(Image::CreateFromTextureID, 3)                                    \
+  V(Image::CreateFromTexturePointer, 3)                               \
   V(Canvas::Create, 6)                                                \
   V(ColorFilter::Create, 1)                                           \
   V(FragmentProgram::Create, 1)                                       \

@@ -31,7 +31,8 @@ class EmbedderExternalTextureResolver {
 
 #ifdef SHELL_ENABLE_METAL
   explicit EmbedderExternalTextureResolver(
-      EmbedderExternalTextureMetal::ExternalTextureCallback metal_callback);
+      EmbedderExternalTextureMetal::ExternalTextureCallback metal_callback,
+      bool enable_impeller);
 #endif
 
   std::unique_ptr<Texture> ResolveExternalTexture(int64_t texture_id);
@@ -45,6 +46,7 @@ class EmbedderExternalTextureResolver {
 
 #ifdef SHELL_ENABLE_METAL
   EmbedderExternalTextureMetal::ExternalTextureCallback metal_callback_;
+  bool enable_impeller_;
 #endif
 
   FML_DISALLOW_COPY_AND_ASSIGN(EmbedderExternalTextureResolver);

@@ -21,9 +21,21 @@ class LayerScene implements ui.Scene {
   void dispose() {}
 
   @override
+  Future<void> renderToSurface(ui.RenderSurface renderSurface, {bool flipVertical = false}) async {
+     final ui.Picture picture = layerTree.flatten();
+     await picture.renderToSurface(renderSurface, flipVertical: flipVertical);
+  }
+
+  @override
   Future<ui.Image> toImage(int width, int height) {
     final ui.Picture picture = layerTree.flatten();
     return picture.toImage(width, height);
+  }
+
+  @override
+  Future<Object?> toCanvas(int width, int height) {
+    final ui.Picture picture = layerTree.flatten();
+    return picture.toCanvas(width, height);
   }
 
   @override
@@ -174,6 +186,16 @@ class LayerSceneBuilder implements ui.SceneBuilder {
     ui.Offset offset = ui.Offset.zero,
   }) {
     return pushLayer<OpacityEngineLayer>(OpacityEngineLayer(alpha, offset));
+  }
+
+  @override
+  BlendEngineLayer pushBlend(
+    int alpha,
+    ui.BlendMode blendMode, {
+    ui.Offset offset = ui.Offset.zero,
+    ui.EngineLayer? oldLayer,
+  }) {
+    return pushLayer<BlendEngineLayer>(BlendEngineLayer(alpha, blendMode, offset));
   }
 
   @override

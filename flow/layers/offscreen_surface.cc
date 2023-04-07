@@ -4,14 +4,19 @@
 
 #include "flutter/flow/layers/offscreen_surface.h"
 
+#include "fml/build_config.h"
 #include "third_party/skia/include/core/SkColorSpace.h"
 #include "third_party/skia/include/core/SkData.h"
 #include "third_party/skia/include/core/SkImage.h"
 #include "third_party/skia/include/core/SkImageInfo.h"
+#include "third_party/skia/include/core/SkPictureRecorder.h"
 #include "third_party/skia/include/core/SkPixmap.h"
+#include "third_party/skia/include/core/SkSerialProcs.h"
+#include "third_party/skia/include/core/SkSurface.h"
 #include "third_party/skia/include/encode/SkPngEncoder.h"
 #include "third_party/skia/include/gpu/GrDirectContext.h"
 #include "third_party/skia/include/gpu/ganesh/SkSurfaceGanesh.h"
+#include "third_party/skia/include/utils/SkBase64.h"
 
 namespace flutter {
 
@@ -72,6 +77,7 @@ OffscreenSurface::OffscreenSurface(GrDirectContext* surface_context,
   if (offscreen_surface_) {
     adapter_.set_canvas(offscreen_surface_->getCanvas());
   }
+  size_ = size;
 }
 
 sk_sp<SkData> OffscreenSurface::GetRasterData(bool compressed) const {

@@ -356,7 +356,8 @@ class SkwasmRenderer implements Renderer {
     Uint8List list, {
     int? targetWidth,
     int? targetHeight,
-    bool allowUpscaling = true
+    bool allowUpscaling = true,
+    bool mipmapped = true,
   }) async {
     final String? contentType = detectContentType(list);
     if (contentType == null) {

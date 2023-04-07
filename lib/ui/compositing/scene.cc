@@ -4,6 +4,7 @@
 
 #include "flutter/lib/ui/compositing/scene.h"
 
+#include "flutter/fml/make_copyable.h"
 #include "flutter/fml/trace_event.h"
 #include "flutter/lib/ui/painting/display_list_deferred_image_gpu_skia.h"
 #include "flutter/lib/ui/painting/image.h"
@@ -56,6 +57,53 @@ bool Scene::valid() {
 void Scene::dispose() {
   layer_tree_config_.root_layer.reset();
   ClearDartWrapper();
+}
+
+void Scene::renderToSurface(fml::RefPtr<RenderSurface> render_surface,
+                            bool flipY,
+                            Dart_Handle callback) {
+  auto* dart_state = UIDartState::Current();
+  const auto ui_task_runner = dart_state->GetTaskRunners().GetUITaskRunner();
+  const auto raster_task_runner =
+      dart_state->GetTaskRunners().GetRasterTaskRunner();
+  auto persistent_callback =
+      std::make_unique<tonic::DartPersistentValue>(dart_state, callback);
+  const auto snapshot_delegate = dart_state->GetSnapshotDelegate();
+  const auto layer_tree =
+      std::make_shared<LayerTree>(layer_tree_config_, render_surface->size());
+
+  const auto ui_task =
+      fml::MakeCopyable([persistent_callback = std::move(persistent_callback)](
+                            bool success) mutable {
+        auto dart_state = persistent_callback->dart_state().lock();
+        if (!dart_state) {
+          return;
+        }
+        tonic::DartState::Scope scope(dart_state);
+        tonic::DartInvoke(persistent_callback->Get(), {tonic::ToDart(success)});
+        persistent_callback.reset();
+      });
+
+  const auto raster_task = fml::MakeCopyable(
+      [ui_task = std::move(ui_task), ui_task_runner = std::move(ui_task_runner),
+       render_surface = std::move(render_surface),
+       snapshot_delegate = std::move(snapshot_delegate),
+       layer_tree = layer_tree]() {
+        RasterStatus raster_status = RasterStatus::kFailed;
+        if (layer_tree) {
+          raster_status =
+              snapshot_delegate->DrawLayerToSurface(layer_tree, render_surface);
+        }
+
+        fml::TaskRunner::RunNowOrPostTask(
+            std::move(ui_task_runner),
+            [ui_task = std::move(ui_task), raster_status] {
+              ui_task(raster_status == RasterStatus::kSuccess);
+            });
+      });
+
+  fml::TaskRunner::RunNowOrPostTask(std::move(raster_task_runner),
+                                    std::move(raster_task));
 }
 
 Dart_Handle Scene::toImageSync(uint32_t width,

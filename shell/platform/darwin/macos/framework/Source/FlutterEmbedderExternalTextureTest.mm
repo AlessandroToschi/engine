@@ -110,7 +110,7 @@ TEST(FlutterEmbedderExternalTextureUnittests, TestTextureResolution) {
 
   // Render the texture.
   std::unique_ptr<flutter::Texture> texture =
-      std::make_unique<EmbedderExternalTextureMetal>(texture_id, callback);
+      std::make_unique<EmbedderExternalTextureMetal>(texture_id, callback, false);
   SkRect bounds = SkRect::MakeWH(info.width(), info.height());
   DlImageSampling sampling = DlImageSampling::kNearestNeighbor;
   DlSkCanvasAdapter canvas(gpuSurface->getCanvas());
@@ -165,7 +165,7 @@ TEST(FlutterEmbedderExternalTextureUnittests, TestPopulateExternalTexture) {
 
   // Render the texture.
   std::unique_ptr<flutter::Texture> texture =
-      std::make_unique<EmbedderExternalTextureMetal>(texture_id, callback);
+      std::make_unique<EmbedderExternalTextureMetal>(texture_id, callback, false);
   SkRect bounds = SkRect::MakeWH(info.width(), info.height());
   DlImageSampling sampling = DlImageSampling::kNearestNeighbor;
   DlSkCanvasAdapter canvas(gpuSurface->getCanvas());
@@ -220,7 +220,7 @@ TEST(FlutterEmbedderExternalTextureUnittests, TestPopulateExternalTextureYUVA) {
 
   // Render the texture.
   std::unique_ptr<flutter::Texture> texture =
-      std::make_unique<EmbedderExternalTextureMetal>(texture_id, callback);
+      std::make_unique<EmbedderExternalTextureMetal>(texture_id, callback, false);
   SkRect bounds = SkRect::MakeWH(info.width(), info.height());
   DlImageSampling sampling = DlImageSampling::kNearestNeighbor;
   DlSkCanvasAdapter canvas(gpuSurface->getCanvas());
@@ -275,7 +275,7 @@ TEST(FlutterEmbedderExternalTextureUnittests, TestPopulateExternalTextureYUVA2) 
 
   // Render the texture.
   std::unique_ptr<flutter::Texture> texture =
-      std::make_unique<EmbedderExternalTextureMetal>(texture_id, callback);
+      std::make_unique<EmbedderExternalTextureMetal>(texture_id, callback, false);
   SkRect bounds = SkRect::MakeWH(info.width(), info.height());
   DlImageSampling sampling = DlImageSampling::kNearestNeighbor;
   DlSkCanvasAdapter canvas(gpuSurface->getCanvas());

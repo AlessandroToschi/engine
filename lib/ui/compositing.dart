@@ -3,6 +3,9 @@
 // found in the LICENSE file.
 part of dart.ui;
 
+@pragma('vm:entry-point')
+ class RendererBackgroundException { }
+
 /// An opaque object representing a composited scene.
 ///
 /// To create a Scene object, use a [SceneBuilder].
@@ -31,6 +34,8 @@ abstract class Scene {
   /// This can't be a leaf call because the native function calls Dart API
   /// (Dart_SetNativeInstanceField).
   void dispose();
+
+  Future<void> renderToSurface(RenderSurface renderSurface, {bool flipY = false});
 }
 
 @pragma('vm:entry-point')
@@ -80,6 +85,24 @@ base class _NativeScene extends NativeFieldWrapperClass1 implements Scene {
   @override
   @Native<Void Function(Pointer<Void>)>(symbol: 'Scene::dispose')
   external void dispose();
+
+  @override
+  Future<void> renderToSurface(RenderSurface renderSurface, {bool flipY = false}) {
+    final Completer<void> completer = Completer<void>();
+
+    _renderToSurface(renderSurface, flipY, (bool result) {
+      if (result) {
+        completer.complete();
+      } else {
+        completer.completeError(RendererBackgroundException());
+      }
+     });
+
+    return completer.future;
+  }
+
+  @Native<Void Function(Pointer<Void>, Handle, Bool, Handle)>(symbol: 'Scene::renderToSurface')
+  external void _renderToSurface(RenderSurface renderSurface, bool flipY, _Callback<bool> callback);
 }
 
 // Lightweight wrapper of a native layer object.
@@ -186,6 +209,10 @@ class ClipPathEngineLayer extends _EngineLayerWrapper {
 class OpacityEngineLayer extends _EngineLayerWrapper {
   OpacityEngineLayer._(super.nativeLayer) : super._();
 }
+
+class BlendEngineLayer extends _EngineLayerWrapper {
+   BlendEngineLayer._(EngineLayer nativeLayer) : super._(nativeLayer);
+ }
 
 /// An opaque handle to a color filter engine layer.
 ///
@@ -411,6 +438,13 @@ abstract class SceneBuilder {
     BlendMode blendMode, {
     ShaderMaskEngineLayer? oldLayer,
     FilterQuality filterQuality = FilterQuality.low,
+  });
+
+  BlendEngineLayer pushBlend(
+    int alpha,
+    BlendMode blendMode, {
+    Offset? offset = Offset.zero,
+    BlendEngineLayer? oldLayer,
   });
 
   /// Ends the effect of the most recently pushed operation.
@@ -747,6 +781,34 @@ base class _NativeSceneBuilder extends NativeFieldWrapperClass1 implements Scene
   @Native<Void Function(Pointer<Void>, Handle, Int32, Double, Double, Handle)>(symbol: 'SceneBuilder::pushOpacity')
   external void _pushOpacity(EngineLayer layer, int alpha, double dx, double dy, EngineLayer? oldLayer);
 
+  @override
+  BlendEngineLayer pushBlend(
+     int alpha,
+     BlendMode blendMode, {
+     Offset? offset = Offset.zero,
+     BlendEngineLayer? oldLayer,
+   }) {
+     assert(_debugCheckCanBeUsedAsOldLayer(oldLayer, 'pushBlend'));
+     final EngineLayer engineLayer = _NativeEngineLayer._();
+     _pushBlend(engineLayer, alpha, offset!.dx, offset.dy, blendMode.index, oldLayer?._nativeLayer);
+     final BlendEngineLayer layer = BlendEngineLayer._(engineLayer);
+     assert(_debugPushLayer(layer));
+     return layer;
+   }
+
+  @Native<Void Function(Pointer<Void>, Handle, Int32, Double, Double, Int32, Handle)>(symbol: 'SceneBuilder::pushBlend')
+  external void _pushBlend(EngineLayer layer, int alpha, double dx, double dy, int blendMode, EngineLayer? oldLayer);
+
+  /// Pushes a color filter operation onto the operation stack.
+  ///
+  /// The given color is applied to the objects' rasterization using the given
+  /// blend mode.
+  ///
+  /// {@macro dart.ui.sceneBuilder.oldLayer}
+  ///
+  /// {@macro dart.ui.sceneBuilder.oldLayerVsRetained}
+  ///
+  /// See [pop] for details about the operation stack.
   @override
   ColorFilterEngineLayer pushColorFilter(
     ColorFilter filter, {

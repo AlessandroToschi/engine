@@ -21,6 +21,9 @@ class AllocatorVK final : public Allocator {
   // |Allocator|
   ~AllocatorVK() override;
 
+  std::shared_ptr<Texture> WrapTexture(const TextureDescriptor& desc,
+                                       int64_t raw_texture) const override;
+
  private:
   friend class ContextVK;
 

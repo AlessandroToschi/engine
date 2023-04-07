@@ -82,6 +82,8 @@ class Surface {
   int? _glContext;
   int? _skiaCacheBytes;
 
+  SkGrContext? get grContext => _grContext;
+
   /// The root HTML element for this surface.
   ///
   /// This element contains the canvas used to draw the UI. Unlike the canvas,

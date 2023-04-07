@@ -3,6 +3,9 @@
 // found in the LICENSE file.
 part of dart.ui;
 
+@pragma('vm:entry-point')
+ class RendererBackgroundException { }
+
 /// An opaque object representing a composited scene.
 ///
 /// To create a Scene object, use a [SceneBuilder].
@@ -69,6 +72,23 @@ class Scene extends NativeFieldWrapperClass1 {
   /// (Dart_SetNativeInstanceField).
   @Native<Void Function(Pointer<Void>)>(symbol: 'Scene::dispose')
   external void dispose();
+
+  Future<void> renderToSurface(RenderSurface renderSurface, {bool flipY = false}) {
+    final Completer<void> completer = Completer<void>();
+
+    _renderToSurface(renderSurface, flipY, (bool result) {
+      if (result) {
+        completer.complete();
+      } else {
+        completer.completeError(RendererBackgroundException());
+      }
+     });
+
+    return completer.future;
+  }
+
+  @Native<Void Function(Pointer<Void>, Handle, Bool, Handle)>(symbol: 'Scene::renderToSurface')
+  external void _renderToSurface(RenderSurface renderSurface, bool flipY, _Callback<bool> callback);
 }
 
 // Lightweight wrapper of a native layer object.
@@ -175,6 +195,10 @@ class ClipPathEngineLayer extends _EngineLayerWrapper {
 class OpacityEngineLayer extends _EngineLayerWrapper {
   OpacityEngineLayer._(super.nativeLayer) : super._();
 }
+
+class BlendEngineLayer extends _EngineLayerWrapper {
+   BlendEngineLayer._(EngineLayer nativeLayer) : super._(nativeLayer);
+ }
 
 /// An opaque handle to a color filter engine layer.
 ///
@@ -476,6 +500,23 @@ class SceneBuilder extends NativeFieldWrapperClass1 {
 
   @Native<Void Function(Pointer<Void>, Handle, Int32, Double, Double, Handle)>(symbol: 'SceneBuilder::pushOpacity')
   external void _pushOpacity(EngineLayer layer, int alpha, double dx, double dy, EngineLayer? oldLayer);
+
+  BlendEngineLayer pushBlend(
+     int alpha,
+     BlendMode blendMode, {
+     Offset? offset = Offset.zero,
+     BlendEngineLayer? oldLayer,
+   }) {
+     assert(_debugCheckCanBeUsedAsOldLayer(oldLayer, 'pushBlend'));
+     final EngineLayer engineLayer = EngineLayer._();
+     _pushBlend(engineLayer, alpha, offset!.dx, offset.dy, blendMode.index, oldLayer?._nativeLayer);
+     final BlendEngineLayer layer = BlendEngineLayer._(engineLayer);
+     assert(_debugPushLayer(layer));
+     return layer;
+   }
+
+  @FfiNative<Void Function(Pointer<Void>, Handle, Int32, Double, Double, Int32, Handle)>('SceneBuilder::pushBlend')
+  external void _pushBlend(EngineLayer layer, int alpha, double dx, double dy, int blendMode, EngineLayer? oldLayer);
 
   /// Pushes a color filter operation onto the operation stack.
   ///

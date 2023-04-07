@@ -20,6 +20,8 @@ class SnapshotControllerImpeller : public SnapshotController {
 
   sk_sp<SkImage> ConvertToRasterImage(sk_sp<SkImage> image) override;
 
+  sk_sp<DlImage> MakeFromTexture(int64_t raw_texture, SkISize size) override;
+
  private:
   sk_sp<DlImage> DoMakeRasterSnapshot(const sk_sp<DisplayList>& display_list,
                                       SkISize size);

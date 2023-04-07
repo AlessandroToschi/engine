@@ -505,6 +505,16 @@ class Rasterizer final : public SnapshotDelegate,
       sk_sp<DisplayList> display_list,
       const SkImageInfo& image_info) override;
 
+  std::unique_ptr<GpuImageResult> MakeSkiaGpuImageFromTexture(
+      int64_t raw_texture,
+      const SkISize& size) override;
+
+  sk_sp<DlImage> MakeImpellerGpuImageFromTexture(int64_t raw_texture,
+                                                 const SkISize& size) override;
+
+  std::unique_ptr<Surface> MakeOffscreenSurface(int64_t raw_texture,
+                                                const SkISize& size) override;
+
   // |SnapshotDelegate|
   sk_sp<DlImage> MakeRasterSnapshot(sk_sp<DisplayList> display_list,
                                     SkISize picture_size) override;
@@ -566,6 +576,10 @@ class Rasterizer final : public SnapshotDelegate,
   RasterStatus DrawToSurfaceUnsafe(FrameTimingsRecorder& frame_timings_recorder,
                                    flutter::LayerTree& layer_tree,
                                    float device_pixel_ratio);
+
+  RasterStatus DrawLayerToSurface(
+      std::shared_ptr<flutter::LayerTree> layer_tree,
+      fml::RefPtr<RenderSurface> render_surface) override;
 
   void FireNextFrameCallbackIfPresent();
 

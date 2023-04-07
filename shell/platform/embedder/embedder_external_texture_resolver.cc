@@ -17,8 +17,10 @@ EmbedderExternalTextureResolver::EmbedderExternalTextureResolver(
 
 #ifdef SHELL_ENABLE_METAL
 EmbedderExternalTextureResolver::EmbedderExternalTextureResolver(
-    EmbedderExternalTextureMetal::ExternalTextureCallback metal_callback)
-    : metal_callback_(std::move(metal_callback)) {}
+    EmbedderExternalTextureMetal::ExternalTextureCallback metal_callback,
+    bool enable_impeller)
+    : metal_callback_(std::move(metal_callback)),
+      enable_impeller_(enable_impeller) {}
 #endif
 
 std::unique_ptr<Texture>
@@ -32,8 +34,8 @@ EmbedderExternalTextureResolver::ResolveExternalTexture(int64_t texture_id) {
 
 #ifdef SHELL_ENABLE_METAL
   if (metal_callback_) {
-    return std::make_unique<EmbedderExternalTextureMetal>(texture_id,
-                                                          metal_callback_);
+    return std::make_unique<EmbedderExternalTextureMetal>(
+        texture_id, metal_callback_, enable_impeller_);
   }
 #endif
 

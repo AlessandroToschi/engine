@@ -68,6 +68,18 @@ class EngineScene implements ui.Scene {
     }
     return recorder.endRecording().toImageSync(width, height);
   }
+
+  @override
+  Future<void> renderToSurface(ui.RenderSurface renderSurface, {bool flipVertical = false}) {
+    // TODO: implement renderToSurface
+    throw UnimplementedError();
+  }
+
+  @override
+  Future<Object?> toCanvas(int width, int height) {
+    // TODO: implement toCanvas
+    throw UnimplementedError();
+  }
 }
 
 class EngineSceneBuilder implements ui.SceneBuilder {
@@ -282,5 +294,11 @@ class EngineSceneBuilder implements ui.SceneBuilder {
       operation: operation
     );
     return layer;
+  }
+
+  @override
+  ui.BlendEngineLayer pushBlend(int alpha, ui.BlendMode blendMode, {ui.Offset offset = ui.Offset.zero, ui.BlendEngineLayer? oldLayer}) {
+    // TODO: implement pushBlend
+    throw UnimplementedError();
   }
 }

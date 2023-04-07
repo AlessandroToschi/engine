@@ -48,11 +48,12 @@ class ShaderData {
         textureCount += 1;
       } else {
         final Object? rows = rawUniformData['rows'];
+        final Object? columns = rawUniformData['columns'];
         final Object? bitWidth = rawUniformData['bit_width'];
-        if (bitWidth is! int || rows is! int) {
+        if (bitWidth is! int || rows is! int || columns is! int) {
           throw const FormatException('Invalid Shader Data');
         }
-        floatCount += (bitWidth ~/ 32) * rows;
+        floatCount += (bitWidth  ~/ 32) * rows * columns;
       }
       uniforms[location] = UniformData(
         name: name,

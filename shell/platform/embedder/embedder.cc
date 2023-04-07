@@ -1965,7 +1965,7 @@ FlutterEngineResult FlutterEngineInitialize(size_t version,
         return texture;
       };
       external_texture_resolver = std::make_unique<ExternalTextureResolver>(
-          external_texture_metal_callback);
+          external_texture_metal_callback, settings.enable_impeller);
     }
   }
 #endif

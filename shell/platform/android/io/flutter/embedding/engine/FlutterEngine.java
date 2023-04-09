@@ -24,6 +24,7 @@ import io.flutter.embedding.engine.plugins.service.ServiceControlSurface;
 import io.flutter.embedding.engine.plugins.util.GeneratedPluginRegister;
 import io.flutter.embedding.engine.renderer.FlutterRenderer;
 import io.flutter.embedding.engine.renderer.RenderSurface;
+import io.flutter.embedding.engine.renderer.Task;
 import io.flutter.embedding.engine.systemchannels.AccessibilityChannel;
 import io.flutter.embedding.engine.systemchannels.DeferredComponentChannel;
 import io.flutter.embedding.engine.systemchannels.LifecycleChannel;
@@ -644,5 +645,9 @@ public class FlutterEngine {
      * <p>For the duration of the call, the Flutter engine is still valid.
      */
     void onEngineWillDestroy();
+  }
+
+  public void runOnRasterThread(Task task) {
+    this.flutterJNI.runOnRasterThread(task);
   }
 }

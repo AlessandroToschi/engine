@@ -176,6 +176,10 @@ class OpacityEngineLayer extends _EngineLayerWrapper {
   OpacityEngineLayer._(super.nativeLayer) : super._();
 }
 
+class BlendEngineLayer extends _EngineLayerWrapper {
+   BlendEngineLayer._(EngineLayer nativeLayer) : super._(nativeLayer);
+ }
+
 /// An opaque handle to a color filter engine layer.
 ///
 /// Instances of this class are created by [SceneBuilder.pushColorFilter].
@@ -476,6 +480,23 @@ class SceneBuilder extends NativeFieldWrapperClass1 {
 
   @Native<Void Function(Pointer<Void>, Handle, Int32, Double, Double, Handle)>(symbol: 'SceneBuilder::pushOpacity')
   external void _pushOpacity(EngineLayer layer, int alpha, double dx, double dy, EngineLayer? oldLayer);
+
+  BlendEngineLayer pushBlend(
+     int alpha,
+     BlendMode blendMode, {
+     Offset? offset = Offset.zero,
+     BlendEngineLayer? oldLayer,
+   }) {
+     assert(_debugCheckCanBeUsedAsOldLayer(oldLayer, 'pushBlend'));
+     final EngineLayer engineLayer = EngineLayer._();
+     _pushBlend(engineLayer, alpha, offset!.dx, offset.dy, blendMode.index, oldLayer?._nativeLayer);
+     final BlendEngineLayer layer = BlendEngineLayer._(engineLayer);
+     assert(_debugPushLayer(layer));
+     return layer;
+   }
+
+  @FfiNative<Void Function(Pointer<Void>, Handle, Int32, Double, Double, Int32, Handle)>('SceneBuilder::pushBlend')
+  external void _pushBlend(EngineLayer layer, int alpha, double dx, double dy, int blendMode, EngineLayer? oldLayer);
 
   /// Pushes a color filter operation onto the operation stack.
   ///

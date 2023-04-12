@@ -21,6 +21,10 @@ class OffscreenSurface {
   explicit OffscreenSurface(GrDirectContext* surface_context,
                             const SkISize& size);
 
+  OffscreenSurface(int64_t raw_texture,
+                   GrDirectContext* surface_context,
+                   const SkISize& size);
+
   ~OffscreenSurface() = default;
 
   sk_sp<SkData> GetRasterData(bool compressed) const;
@@ -29,9 +33,12 @@ class OffscreenSurface {
 
   bool IsValid() const;
 
+  SkISize size() const { return size_; }
+
  private:
   sk_sp<SkSurface> offscreen_surface_;
   DlSkCanvasAdapter adapter_;
+  SkISize size_;
 
   FML_DISALLOW_COPY_AND_ASSIGN(OffscreenSurface);
 };

@@ -656,6 +656,44 @@ RasterStatus Rasterizer::DrawToSurfaceUnsafe(
   return RasterStatus::kFailed;
 }
 
+RasterStatus Rasterizer::DrawLayerToSurface(
+    std::shared_ptr<LayerTree> layer_tree,
+    std::shared_ptr<OffscreenSurface> surface,
+    bool flipY) {
+  RasterStatus raster_status;
+  delegate_.GetIsGpuDisabledSyncSwitch()->Execute(
+      fml::SyncSwitch::Handlers()
+          .SetIfTrue([&]() { raster_status = RasterStatus::kFailed; })
+          .SetIfFalse([&] {
+            const auto canvas = surface->GetCanvas();
+            if (!canvas) {
+              raster_status = RasterStatus::kFailed;
+              return;
+            }
+            canvas->save();
+            if (flipY) {
+              canvas->translate(0.0, surface->size().height());
+              canvas->scale(1.0, -1.0);
+            }
+
+            SkMatrix root_surface_transform;
+            root_surface_transform.reset();
+
+            const auto context = surface_->GetContext();
+
+            const auto context_switch = surface_->MakeRenderContextCurrent();
+            const auto frame = compositor_context_->AcquireFrame(
+                context, canvas, nullptr, root_surface_transform, false, true,
+                raster_thread_merger_, nullptr, surface_->GetAiksContext());
+
+            canvas->clear(SK_ColorTRANSPARENT);
+            raster_status = frame->Raster(*layer_tree.get(), false, nullptr);
+            context->flushAndSubmit(true);
+            canvas->restore();
+          }));
+  return raster_status;
+}
+
 static sk_sp<SkData> ScreenshotLayerTreeAsPicture(
     flutter::LayerTree* tree,
     flutter::CompositorContext& compositor_context) {

@@ -29,6 +29,7 @@
 #include "flutter/lib/ui/painting/path_measure.h"
 #include "flutter/lib/ui/painting/picture.h"
 #include "flutter/lib/ui/painting/picture_recorder.h"
+#include "flutter/lib/ui/painting/render_surface.h"
 #include "flutter/lib/ui/painting/vertices.h"
 #include "flutter/lib/ui/semantics/semantics_update.h"
 #include "flutter/lib/ui/semantics/semantics_update_builder.h"
@@ -83,6 +84,7 @@ typedef CanvasPath Path;
   V(PathMeasure::Create, 3)                                           \
   V(Path::Create, 1)                                                  \
   V(PictureRecorder::Create, 1)                                       \
+  V(RenderSurface::Create, 2)                                         \
   V(SceneBuilder::Create, 1)                                          \
   V(SemanticsUpdateBuilder::Create, 1)                                \
   /* Other */                                                         \
@@ -273,6 +275,9 @@ typedef CanvasPath Path;
   V(Picture, dispose, 1)                               \
   V(Picture, toImage, 4)                               \
   V(Picture, toImageSync, 4)                           \
+  V(RenderSurface, setup, 4)                           \
+  V(RenderSurface, dispose, 2)                         \
+  V(RenderSurface, is_valid, 1)                        \
   V(SceneBuilder, addPerformanceOverlay, 6)            \
   V(SceneBuilder, addPicture, 5)                       \
   V(SceneBuilder, addPlatformView, 6)                  \
@@ -298,6 +303,7 @@ typedef CanvasPath Path;
   V(Scene, dispose, 1)                                 \
   V(Scene, toImage, 4)                                 \
   V(Scene, toImageSync, 4)                             \
+  V(Scene, renderToSurface, 4)                         \
   V(SemanticsUpdateBuilder, build, 2)                  \
   V(SemanticsUpdateBuilder, updateCustomAction, 5)     \
   V(SemanticsUpdateBuilder, updateNode, 36)            \

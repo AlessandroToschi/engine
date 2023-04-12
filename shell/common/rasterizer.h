@@ -568,6 +568,10 @@ class Rasterizer final : public SnapshotDelegate,
   RasterStatus DrawToSurfaceUnsafe(FrameTimingsRecorder& frame_timings_recorder,
                                    flutter::LayerTree& layer_tree);
 
+  RasterStatus DrawLayerToSurface(std::shared_ptr<LayerTree> layer_tree,
+                                  std::shared_ptr<OffscreenSurface> surface,
+                                  bool flipY) override;
+
   void FireNextFrameCallbackIfPresent();
 
   static bool NoDiscard(const flutter::LayerTree& layer_tree) { return false; }

@@ -6618,6 +6618,40 @@ class ImageDescriptor extends NativeFieldWrapperClass1 {
   external void _instantiateCodec(Codec outCodec, int targetWidth, int targetHeight);
 }
 
+class RenderSurface extends NativeFieldWrapperClass1 {
+  RenderSurface._(int rawTexture) {
+    _constructor(rawTexture);
+  }
+
+  static Future<RenderSurface> fromTexture(int rawTexture, int width, int height) {
+    final Completer<RenderSurface> completer = Completer<RenderSurface>();
+    final RenderSurface renderSurface = RenderSurface._(rawTexture);
+    renderSurface._setup(width, height, () { completer.complete(renderSurface); });
+    return completer.future;
+  }
+
+  @FfiNative<Void Function(Handle, Int64)>('RenderSurface::Create')
+  external void _constructor(int rawTexture);
+
+  bool get isValid => _isValid();
+
+  @FfiNative<Bool Function(Pointer<Void>)>('RenderSurface::is_valid')
+  external bool _isValid();
+
+  @FfiNative<Void Function(Pointer<Void>, Int32, Int32, Handle)>('RenderSurface::setup')
+  external void _setup(int width, int height, VoidCallback callback);
+
+  Future<void> dispose() async {
+    final Completer<void> completer = Completer<void>();
+    _dispose(() => completer.complete());
+    return completer.future;
+  }
+
+  @FfiNative<Void Function(Pointer<Void>, Handle)>('RenderSurface::dispose')
+  external void _dispose(VoidCallback callback);
+
+}
+
 /// Generic callback signature, used by [_futurize].
 typedef _Callback<T> = void Function(T result);
 

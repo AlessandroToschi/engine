@@ -9,7 +9,9 @@
 
 #include "flutter/common/graphics/texture.h"
 #include "flutter/display_list/display_list.h"
+#include "flutter/flow/layers/layer_tree.h"
 #include "flutter/flow/skia_gpu_object.h"
+#include "flutter/lib/ui/painting/render_surface.h"
 #include "third_party/skia/include/core/SkImage.h"
 #include "third_party/skia/include/core/SkPicture.h"
 #include "third_party/skia/include/core/SkPromiseImageTexture.h"
@@ -81,6 +83,11 @@ class SnapshotDelegate {
                                             SkISize picture_size) = 0;
 
   virtual sk_sp<SkImage> ConvertToRasterImage(sk_sp<SkImage> image) = 0;
+
+  virtual RasterStatus DrawLayerToSurface(
+      std::shared_ptr<LayerTree> layer_tree,
+      std::shared_ptr<OffscreenSurface> surface,
+      bool flipY) = 0;
 };
 
 }  // namespace flutter

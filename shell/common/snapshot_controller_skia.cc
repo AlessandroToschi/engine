@@ -78,6 +78,38 @@ sk_sp<DlImage> SnapshotControllerSkia::MakeFromTexture(int64_t raw_texture,
   return sk_make_sp<DlImageSkia>(image);
 }
 
+std::unique_ptr<Surface> SnapshotControllerSkia::MakeOffscreenSurface(
+    int64_t raw_texture,
+    const SkISize& size) {
+  GrBackendTexture texture;
+  SkColorType color_type;
+#ifdef FML_OS_ANDROID
+  GrGLTextureInfo texture_info;
+  texture_info.fTarget = 0x0DE1;  // GR_GL_TEXTURE2D_2D;
+  texture_info.fID = raw_texture;
+  texture_info.fFormat = 0x8058;  // GR_GL_RGBA8;
+  texture = GrBackendTexture{size.width(), size.height(), GrMipMapped::kNo,
+                             texture_info};
+  color_type = SkColorType::kRGBA_8888_SkColorType;
+#elif FML_OS_IOS
+  GrMtlTextureInfo texture_info;
+  texture_info.fTexture =
+      sk_cfp<const void*>(reinterpret_cast<const void*>(raw_texture));
+  texture = GrBackendTexture{size.width(), size.height(), GrMipMapped::kNo,
+                             texture_info};
+  color_type = SkColorType::kBGRA_8888_SkColorType;
+#else
+  texture = GrBackendTexture();
+  color_type = kRGBA_8888_SkColorType;
+#endif
+  static const auto color_space = SkColorSpace::MakeSRGB();
+  auto context = GetDelegate().GetSurface()->GetContext();
+  auto surface = SkSurface::MakeFromBackendTexture(
+      context, texture, kBottomLeft_GrSurfaceOrigin, 1, color_type, color_space,
+      nullptr, nullptr, nullptr);
+  return std::make_unique<OffscreenSkiaSurface>(surface, context);
+}
+
 sk_sp<DlImage> SnapshotControllerSkia::DoMakeRasterSnapshot(
     SkISize size,
     std::function<void(SkCanvas*)> draw_callback) {
@@ -187,4 +219,37 @@ sk_sp<SkImage> SnapshotControllerSkia::ConvertToRasterImage(
   return result->skia_image();
 }
 
+SnapshotControllerSkia::OffscreenSkiaSurface::OffscreenSkiaSurface(
+    sk_sp<SkSurface> surface,
+    GrDirectContext* context)
+    : _surface(std::move(surface)), _context(context) {}
+
+SnapshotControllerSkia::OffscreenSkiaSurface::~OffscreenSkiaSurface() = default;
+
+bool SnapshotControllerSkia::OffscreenSkiaSurface::IsValid() {
+  return _surface != nullptr;
+}
+
+std::unique_ptr<SurfaceFrame>
+SnapshotControllerSkia::OffscreenSkiaSurface::AcquireFrame(
+    const SkISize& size) {
+  auto submit_callback = [](const SurfaceFrame& surface_frame,
+                            SkCanvas* canvas) -> bool {
+    canvas->flush();
+    return true;
+  };
+  SurfaceFrame::FramebufferInfo framebuffer_info;
+  framebuffer_info.supports_readback = true;
+  return std::make_unique<SurfaceFrame>(_surface, framebuffer_info,
+                                        submit_callback, size);
+}
+
+SkMatrix SnapshotControllerSkia::OffscreenSkiaSurface::GetRootTransformation()
+    const {
+  return {};
+}
+
+GrDirectContext* SnapshotControllerSkia::OffscreenSkiaSurface::GetContext() {
+  return _context;
+}
 }  // namespace flutter

@@ -4,6 +4,7 @@
 #include <memory>
 
 #include "flutter/flow/layers/offscreen_surface.h"
+#include "flutter/flow/surface.h"
 #include "flutter/lib/ui/dart_wrapper.h"
 
 namespace flutter {
@@ -18,16 +19,22 @@ class RenderSurface : public RefCountedDartWrappable<RenderSurface> {
   void setup(int32_t width, int32_t height, Dart_Handle callback);
   void dispose(Dart_Handle callback);
 
-  std::shared_ptr<OffscreenSurface> surface() { return _surface; }
   bool is_valid() { return _surface != nullptr; }
+
+  std::unique_ptr<SurfaceFrame> AcquireFrame(const SkISize& size) {
+    return _surface->AcquireFrame(size);
+  }
+
+  SkISize size() { return _size; }
 
   ~RenderSurface() override;
 
  private:
   RenderSurface(int64_t raw_texture);
 
-  std::shared_ptr<OffscreenSurface> _surface;
+  std::unique_ptr<Surface> _surface;
   int64_t _raw_texture;
+  SkISize _size;
 };
 }  // namespace flutter
 

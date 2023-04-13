@@ -93,12 +93,12 @@ void Scene::renderToSurface(fml::RefPtr<RenderSurface> render_surface,
       [ui_task = std::move(ui_task), ui_task_runner = std::move(ui_task_runner),
        render_surface = std::move(render_surface),
        snapshot_delegate = std::move(snapshot_delegate),
-       weak_layer_tree = weak_layer_tree, flipY]() {
+       weak_layer_tree = weak_layer_tree]() {
         const auto layer_tree = weak_layer_tree.lock();
         RasterStatus raster_status = RasterStatus::kFailed;
         if (layer_tree) {
-          raster_status = snapshot_delegate->DrawLayerToSurface(
-              layer_tree, render_surface->surface(), flipY);
+          raster_status =
+              snapshot_delegate->DrawLayerToSurface(layer_tree, render_surface);
         }
 
         fml::TaskRunner::RunNowOrPostTask(

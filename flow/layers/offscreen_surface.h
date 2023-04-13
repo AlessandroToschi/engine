@@ -21,10 +21,6 @@ class OffscreenSurface {
   explicit OffscreenSurface(GrDirectContext* surface_context,
                             const SkISize& size);
 
-  OffscreenSurface(int64_t raw_texture,
-                   GrDirectContext* surface_context,
-                   const SkISize& size);
-
   ~OffscreenSurface() = default;
 
   sk_sp<SkData> GetRasterData(bool compressed) const;

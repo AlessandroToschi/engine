@@ -15,7 +15,9 @@ void RenderSurface::Create(Dart_Handle dart_handle, int64_t raw_texture) {
 }
 
 RenderSurface::RenderSurface(int64_t raw_texture)
-    : _surface{nullptr}, _raw_texture{raw_texture} {}
+    : _surface{nullptr},
+      _raw_texture{raw_texture},
+      _size(SkISize::MakeEmpty()) {}
 
 RenderSurface::~RenderSurface() = default;
 
@@ -43,12 +45,9 @@ void RenderSurface::setup(int32_t width, int32_t height, Dart_Handle callback) {
       [ui_task = std::move(ui_task), ui_task_runner = std::move(ui_task_runner),
        snapshot_delegate = std::move(snapshot_delegate), render_surface = this,
        width, height]() {
-        auto context = snapshot_delegate->GetGrContext();
-        if (context) {
-          render_surface->_surface = std::make_shared<OffscreenSurface>(
-              render_surface->_raw_texture, context,
-              SkISize::Make(width, height));
-        }
+        render_surface->_surface = snapshot_delegate->MakeOffscreenSurface(
+            render_surface->_raw_texture, SkISize::Make(width, height));
+        render_surface->_size = SkISize::Make(width, height);
         fml::TaskRunner::RunNowOrPostTask(std::move(ui_task_runner),
                                           std::move(ui_task));
       });

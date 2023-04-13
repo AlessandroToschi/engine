@@ -377,6 +377,11 @@ sk_sp<DlImage> Rasterizer::MakeImpellerGpuImageFromTexture(
 #endif
 }
 
+std::unique_ptr<Surface> Rasterizer::MakeOffscreenSurface(int64_t raw_texture,
+                                                          const SkISize& size) {
+  return snapshot_controller_->MakeOffscreenSurface(raw_texture, size);
+}
+
 sk_sp<DlImage> Rasterizer::MakeRasterSnapshot(sk_sp<DisplayList> display_list,
                                               SkISize picture_size) {
   return snapshot_controller_->MakeRasterSnapshot(display_list, picture_size);
@@ -657,41 +662,61 @@ RasterStatus Rasterizer::DrawToSurfaceUnsafe(
 }
 
 RasterStatus Rasterizer::DrawLayerToSurface(
-    std::shared_ptr<LayerTree> layer_tree,
-    std::shared_ptr<OffscreenSurface> surface,
-    bool flipY) {
-  RasterStatus raster_status;
-  delegate_.GetIsGpuDisabledSyncSwitch()->Execute(
-      fml::SyncSwitch::Handlers()
-          .SetIfTrue([&]() { raster_status = RasterStatus::kFailed; })
-          .SetIfFalse([&] {
-            const auto canvas = surface->GetCanvas();
-            if (!canvas) {
-              raster_status = RasterStatus::kFailed;
-              return;
-            }
-            canvas->save();
-            if (flipY) {
-              canvas->translate(0.0, surface->size().height());
-              canvas->scale(1.0, -1.0);
-            }
+    std::shared_ptr<flutter::LayerTree> layer_tree,
+    fml::RefPtr<RenderSurface> render_surface) {
+  auto frame = render_surface->AcquireFrame(layer_tree->frame_size());
+  if (frame == nullptr) {
+    return RasterStatus::kFailed;
+  }
+  SkMatrix root_surface_transformation = SkMatrix{};
 
-            SkMatrix root_surface_transform;
-            root_surface_transform.reset();
+  const auto context_switch = surface_->MakeRenderContextCurrent();
 
-            const auto context = surface_->GetContext();
+  auto canvas = frame->SkiaCanvas();
 
-            const auto context_switch = surface_->MakeRenderContextCurrent();
-            const auto frame = compositor_context_->AcquireFrame(
-                context, canvas, nullptr, root_surface_transform, false, true,
-                raster_thread_merger_, nullptr, surface_->GetAiksContext());
+#ifdef IMPELLER_SUPPORTS_RENDERING
+  if (delegate_.GetSettings().enable_impeller) {
+    canvas->translate(0.0, render_surface->size().height());
+    canvas->scale(1.0, -1.0);
+  }
+#endif
 
-            canvas->clear(SK_ColorTRANSPARENT);
-            raster_status = frame->Raster(*layer_tree.get(), false, nullptr);
-            context->flushAndSubmit(true);
-            canvas->restore();
-          }));
-  return raster_status;
+  auto compositor_frame = compositor_context_->AcquireFrame(
+      surface_->GetContext(),       // skia GrContext
+      canvas,                       // root surface canvas
+      nullptr,                      // external view embedder
+      root_surface_transformation,  // root surface transformation
+      false,                        // instrumentation enabled
+      frame->framebuffer_info()
+          .supports_readback,                // surface supports pixel reads
+      raster_thread_merger_,                 // thread merger
+      frame->GetDisplayListBuilder().get(),  // display list builder
+      surface_->GetAiksContext()             // aiks context
+  );
+  if (compositor_frame) {
+    std::unique_ptr<FrameDamage> damage;
+    bool ignore_raster_cache = true;
+
+    RasterStatus raster_status =
+        compositor_frame->Raster(*layer_tree,          // layer tree
+                                 ignore_raster_cache,  // ignore raster cache
+                                 nullptr               // frame damage
+        );
+    if (raster_status == RasterStatus::kFailed ||
+        raster_status == RasterStatus::kSkipAndRetry) {
+      return raster_status;
+    }
+    frame->Submit();
+
+    if (surface_->GetContext()) {
+      surface_->GetContext()->flushAndSubmit(true);
+      surface_->GetContext()->performDeferredCleanup(kSkiaCleanupExpiration);
+    }
+
+    return raster_status;
+  }
+
+  return RasterStatus::kFailed;
 }
 
 static sk_sp<SkData> ScreenshotLayerTreeAsPicture(

@@ -75,40 +75,6 @@ OffscreenSurface::OffscreenSurface(GrDirectContext* surface_context,
   size_ = size;
 }
 
-OffscreenSurface::OffscreenSurface(int64_t raw_texture,
-                                   GrDirectContext* surface_context,
-                                   const SkISize& size) {
-  static auto color_space = SkColorSpace::MakeSRGB();
-#ifdef FML_OS_ANDROID
-  GrGLTextureInfo texture_info;
-  texture_info.fTarget = 0x0DE1;  // GR_GL_TEXTURE2D_2D;
-  texture_info.fID = raw_texture;
-  texture_info.fFormat = 0x8058;  // GR_GL_RGBA8;
-  const auto texture = GrBackendTexture(size.width(), size.height(),
-                                        GrMipmapped::kNo, texture_info);
-  offscreen_surface_ = SkSurface::MakeFromBackendTexture(
-      reinterpret_cast<GrRecordingContext*>(surface_context), texture,
-      kBottomLeft_GrSurfaceOrigin, 1, kRGBA_8888_SkColorType, color_space,
-      nullptr, nullptr, nullptr);
-#elif FML_OS_IOS
-  GrMtlTextureInfo texture_info;
-  texture_info.fTexture =
-      sk_cfp<const void*>(reinterpret_cast<const void*>(raw_texture));
-  const auto texture = GrBackendTexture(size.width(), size.height(),
-                                        GrMipmapped::kNo, texture_info);
-  offscreen_surface_ = SkSurface::MakeFromBackendTexture(
-      reinterpret_cast<GrRecordingContext*>(surface_context), texture,
-      kBottomLeft_GrSurfaceOrigin, 1, kBGRA_8888_SkColorType, color_space,
-      nullptr, nullptr, nullptr);
-#else
-  offscreen_surface_ = sk_sp<SkSurface>();
-#endif
-  if (offscreen_surface_) {
-    adapter_.set_canvas(offscreen_surface_->getCanvas());
-  }
-  size_ = size;
-}
-
 sk_sp<SkData> OffscreenSurface::GetRasterData(bool compressed) const {
   return flutter::GetRasterData(offscreen_surface_, compressed);
 }

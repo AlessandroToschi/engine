@@ -66,6 +66,10 @@ class SnapshotDelegate {
       int64_t raw_texture,
       const SkISize& size) = 0;
 
+  virtual std::unique_ptr<Surface> MakeOffscreenSurface(
+      int64_t raw_texture,
+      const SkISize& size) = 0;
+
   //----------------------------------------------------------------------------
   /// @brief      Gets the registry of external textures currently in use by the
   ///             rasterizer. These textures may be updated at a cadence
@@ -85,9 +89,8 @@ class SnapshotDelegate {
   virtual sk_sp<SkImage> ConvertToRasterImage(sk_sp<SkImage> image) = 0;
 
   virtual RasterStatus DrawLayerToSurface(
-      std::shared_ptr<LayerTree> layer_tree,
-      std::shared_ptr<OffscreenSurface> surface,
-      bool flipY) = 0;
+      std::shared_ptr<flutter::LayerTree> layer_tree,
+      fml::RefPtr<RenderSurface> render_surface) = 0;
 };
 
 }  // namespace flutter

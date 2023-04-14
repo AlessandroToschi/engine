@@ -4526,9 +4526,9 @@ class FragmentShader extends Shader {
   ///
   /// All the sampler uniforms that a shader expects must be provided or the
   /// results will be undefined.
-  void setImageSampler(int index, Image image) {
+  void setImageSampler(int index, Image image, {FilterQuality filterQuality = FilterQuality.none}) {
     assert(!debugDisposed, 'Tried to access uniforms on a disposed Shader: $this');
-    _setImageSampler(index, image._image);
+    _setImageSampler(index, image._image, filterQuality.index);
   }
 
   /// Releases the native resources held by the [FragmentShader].
@@ -4546,8 +4546,8 @@ class FragmentShader extends Shader {
   @Native<Handle Function(Handle, Handle, Handle, Handle)>(symbol: 'ReusableFragmentShader::Create')
   external Float32List _constructor(FragmentProgram program, int floatUniforms, int samplerUniforms);
 
-  @Native<Void Function(Pointer<Void>, Handle, Handle)>(symbol: 'ReusableFragmentShader::SetImageSampler')
-  external void _setImageSampler(int index, _Image sampler);
+  @Native<Void Function(Pointer<Void>, Handle, Handle, Int32)>(symbol: 'ReusableFragmentShader::SetImageSampler')
+  external void _setImageSampler(int index, _Image sampler, int filterQualityIndex);
 
   @Native<Bool Function(Pointer<Void>)>(symbol: 'ReusableFragmentShader::ValidateSamplers')
   external bool _validateSamplers();

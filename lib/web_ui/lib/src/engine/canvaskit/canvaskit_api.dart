@@ -95,6 +95,8 @@ extension CanvasKitExtension on CanvasKit {
     SkData skData,
   );
 
+  external SkSurface? MakeRenderTarget(SkGrContext grContext, int width, int height);
+
   // Text decoration enum is embedded in the CanvasKit object itself.
   external double get NoDecoration;
   external double get UnderlineDecoration;
@@ -199,6 +201,10 @@ extension SkSurfaceExtension on SkSurface {
   external double height();
   external void dispose();
   external SkImage makeImageSnapshot();
+
+  // clay specific
+  external void updateFromSource(Object src, int width, int height, bool srcIsPremul);
+  external void delete();
 }
 
 @JS()
@@ -2112,6 +2118,7 @@ class TypefaceFontProvider extends SkFontMgr {
 
 extension TypefaceFontProviderExtension on TypefaceFontProvider {
   external void registerFont(Uint8List font, String family);
+  external void registerFontFromTypeface(SkTypeface typeface, String family);
 }
 
 @JS()
@@ -2456,6 +2463,12 @@ class SkObjectFinalizationRegistry {
 extension SkObjectFinalizationRegistryExtension on SkObjectFinalizationRegistry {
   external void register(Object ckObject, Object skObject);
 }
+
+@JS('window.flutterCanvasKit.TypefaceFontProvider.registerFontFromTypeface')
+external Object? get _registerFontFromTypeface;
+
+/// Whether the current browser supports `FinalizationRegistry`.
+bool get apiHasRegisterFontFromTypeface => _registerFontFromTypeface != null;
 
 @JS('window.FinalizationRegistry')
 external Object? get _finalizationRegistryConstructor;

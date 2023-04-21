@@ -17,6 +17,16 @@ class SurfaceScene implements ui.Scene {
 
   final DomElement? webOnlyRootElement;
 
+  @override
+  Future<void> renderToSurface(ui.RenderSurface renderSurface, {bool flipVertical = false}) {
+    throw UnimplementedError('renderToSurface is not implemented for web');
+  }
+
+  @override
+  Future<Object?> toCanvas(int width, int height) {
+    throw UnimplementedError('renderToSurface is not implemented for web');
+  }
+
   /// Creates a raster image representation of the current state of the scene.
   /// This is a slow operation that is performed on a background thread.
   @override

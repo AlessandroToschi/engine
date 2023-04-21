@@ -57,6 +57,11 @@ class EnginePicture implements ui.Picture {
   EnginePicture(this.recordingCanvas, this.cullRect);
 
   @override
+  Future<Object?> toCanvas(int width, int height) async {
+    throw UnimplementedError();
+  }
+
+  @override
   Future<ui.Image> toImage(int width, int height) async {
     final ui.Rect imageRect = ui.Rect.fromLTRB(0, 0, width.toDouble(), height.toDouble());
     final BitmapCanvas canvas = BitmapCanvas.imageData(imageRect);

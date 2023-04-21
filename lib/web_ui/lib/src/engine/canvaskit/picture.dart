@@ -100,6 +100,18 @@ class CkPicture extends ManagedSkiaObject<SkPicture> implements ui.Picture {
   }
 
   @override
+  Future<Object?> toCanvas(int width, int height) async {
+    final Surface surface = SurfaceFactory.instance.pictureToImageSurface;
+    final CkSurface ckSurface =
+      surface.createOrUpdateSurface(ui.Size(width.toDouble(), height.toDouble()));
+    final CkCanvas ckCanvas = ckSurface.getCanvas();
+    ckCanvas.clear(const ui.Color(0x00000000));
+    ckCanvas.drawPicture(this);
+    ckSurface.surface.flush();
+    return surface.htmlCanvas;
+  }
+
+  @override
   ui.Image toImageSync(int width, int height) {
     assert(debugCheckNotDisposed('Cannot convert picture to image.'));
     final Surface surface = SurfaceFactory.instance.pictureToImageSurface;

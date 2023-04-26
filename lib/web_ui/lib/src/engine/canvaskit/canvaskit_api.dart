@@ -204,6 +204,7 @@ extension SkSurfaceExtension on SkSurface {
 
   // clay specific
   external void updateFromSource(Object src, int width, int height, bool srcIsPremul);
+  external void readPixelsGL(Uint8List buffer, SkGrContext grContext);
   external void delete();
 }
 

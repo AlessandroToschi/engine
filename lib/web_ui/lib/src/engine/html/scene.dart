@@ -18,7 +18,7 @@ class SurfaceScene implements ui.Scene {
   final DomElement? webOnlyRootElement;
 
   @override
-  Future<void> renderToSurface(ui.RenderSurface renderSurface, {bool flipVertical = false}) {
+  Future<void> renderToSurface(ui.RenderSurface renderSurface, {bool flipVertical = false}) async {
     throw UnimplementedError('renderToSurface is not implemented for web');
   }
 

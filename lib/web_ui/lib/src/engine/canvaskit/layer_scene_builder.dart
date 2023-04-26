@@ -21,8 +21,9 @@ class LayerScene implements ui.Scene {
   void dispose() {}
 
   @override
-  Future<void> renderToSurface(ui.RenderSurface renderSurface, {bool flipVertical = false}) {
-    throw UnimplementedError('renderToSurface is not implemented for web');
+  Future<void> renderToSurface(ui.RenderSurface renderSurface, {bool flipVertical = false}) async {
+     final ui.Picture picture = layerTree.flatten();
+     await picture.renderToSurface(renderSurface, flipVertical: flipVertical);
   }
 
   @override

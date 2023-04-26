@@ -162,4 +162,23 @@ class CkPicture extends ManagedSkiaObject<SkPicture> implements ui.Picture {
       rawSkiaObject?.delete();
     }
   }
+
+  @override
+  Future<void> renderToSurface(ui.RenderSurface renderSurface, {bool flipVertical = false}) async {
+    if (renderSurface.rawSkiaObject== null) {
+      throw Exception('Render surface not initialized');
+    }
+
+    final SkCanvas canvas = renderSurface.rawSkiaObject!.getCanvas();
+    canvas.save();
+
+    if (flipVertical) {
+      canvas.translate(0, renderSurface.height.toDouble());
+      canvas.scale(1, -1);
+    }
+
+    canvas.drawPicture(rawSkiaObject!);
+    canvas.restore();
+    renderSurface.rawSkiaObject!.flush();
+  }
 }

@@ -128,6 +128,7 @@ abstract class Canvas {
 typedef PictureEventCallback = void Function(Picture picture);
 
 abstract class Picture {
+  Future<void> renderToSurface(RenderSurface renderSurface, {bool flipVertical = false});
   static PictureEventCallback? onCreate;
   static PictureEventCallback? onDispose;
   Future<Object?> toCanvas(int width, int height);

@@ -860,6 +860,17 @@ class RenderSurface extends engine.ManagedSkiaObject<engine.SkSurface> {
 
     return skSurface;
   }
+  
+  void toBytes(ByteBuffer buffer) {
+    if (rawSkiaObject == null) {
+      throw Exception('Failed to create GPU-backed SkSurface for RenderSurface');
+    }
+    final engine.SkGrContext? grContext = engine.SurfaceFactory.instance.baseSurface.grContext;
+    if (grContext == null) {
+      throw Exception('No grContext from baseSurface when setting up RenderSurface.');
+    }
+    rawSkiaObject!.readPixelsGL(buffer.asUint8List(), grContext);
+  }
 
   Image? makeImageSnapshotFromSource(Object src) {
     if (rawSkiaObject == null) {

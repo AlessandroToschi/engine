@@ -188,6 +188,11 @@ class SurfaceSceneBuilder implements ui.SceneBuilder {
         PersistedOpacity(oldLayer as PersistedOpacity?, alpha, offset));
   }
 
+  @override
+  ui.BlendEngineLayer pushBlend(int alpha, ui.BlendMode blendMode, {ui.Offset offset = ui.Offset.zero, ui.EngineLayer? oldLayer,}) {
+    throw UnimplementedError('Blend is not implemented for the html renderer');
+  }
+
   /// Pushes a color filter operation onto the operation stack.
   ///
   /// The given color is applied to the objects' rasterization using the given

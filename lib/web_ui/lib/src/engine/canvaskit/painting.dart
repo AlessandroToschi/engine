@@ -424,11 +424,13 @@ class CkFragmentProgram implements ui.FragmentProgram {
         textureCount += 1;
       } else {
         final Object? rows = rawUniformData['rows'];
+        final Object? columns = rawUniformData['columns'];
         final Object? bitWidth = rawUniformData['bit_width'];
-        if (bitWidth is! int || rows is! int) {
+
+        if (bitWidth is! int || rows is! int || columns is! int) {
           throw const FormatException('Invalid Shader Data');
         }
-        floatCount += (bitWidth ~/ 32) * rows;
+        floatCount += (bitWidth  ~/ 32) * rows * columns;
       }
       uniforms[location] = UniformData(
         name: name,
@@ -479,9 +481,9 @@ class CkFragmentShader implements ui.FragmentShader {
   }
 
   @override
-  void setImageSampler(int index, ui.Image image) {
+  void setImageSampler(int index, ui.Image image, {ui.FilterQuality filterQuality = ui.FilterQuality.none}) {
     final ui.ImageShader sampler = ui.ImageShader(image, ui.TileMode.clamp,
-        ui.TileMode.clamp, toMatrix64(Matrix4.identity().storage));
+        ui.TileMode.clamp, toMatrix64(Matrix4.identity().storage), filterQuality: filterQuality,);
     samplers[index] = (sampler as CkShader).skiaObject;
     setFloat(lastFloatIndex + 2 * index, (sampler as CkImageShader).imageWidth.toDouble());
     setFloat(lastFloatIndex + 2 * index + 1, sampler.imageHeight.toDouble());

@@ -4,6 +4,7 @@
 
 #include "flutter/flow/layers/offscreen_surface.h"
 
+#include "fml/build_config.h"
 #include "third_party/skia/include/core/SkImageEncoder.h"
 #include "third_party/skia/include/core/SkPictureRecorder.h"
 #include "third_party/skia/include/core/SkSerialProcs.h"
@@ -68,6 +69,7 @@ static sk_sp<SkData> GetRasterData(const sk_sp<SkSurface>& offscreen_surface,
 OffscreenSurface::OffscreenSurface(GrDirectContext* surface_context,
                                    const SkISize& size) {
   offscreen_surface_ = CreateSnapshotSurface(surface_context, size);
+  size_ = size;
 }
 
 sk_sp<SkData> OffscreenSurface::GetRasterData(bool compressed) const {

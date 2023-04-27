@@ -1674,6 +1674,34 @@ class Image {
     onCreate?.call(this);
   }
 
+  factory Image.fromTextureID({
+    required int textureId,
+    required int width,
+    required int height
+  }) => Image._(
+    _Image.createFromTextureId(
+      textureId,
+      width,
+      height
+    ),
+    width,
+    height,
+  );
+
+  factory Image.fromTexturePointer({
+    required int texturePointer,
+    required int width,
+    required int height
+  }) => Image._(
+    _Image.createFromTexturePointer(
+      texturePointer,
+      width,
+      height
+    ),
+    width,
+    height,
+  );
+
   // C++ unit tests access this.
   @pragma('vm:entry-point')
   final _Image _image;
@@ -1691,6 +1719,8 @@ class Image {
   /// than to use [onDispose] directly because [MemoryAllocations]
   /// allows multiple callbacks.
   static ImageEventCallback? onDispose;
+
+  void Function()? disposeCallback;
 
   StackTrace? _debugStack;
 
@@ -1719,6 +1749,7 @@ class Image {
     final bool removed = _image._handles.remove(this);
     assert(removed);
     if (_image._handles.isEmpty) {
+      disposeCallback?.call();
       _image.dispose();
     }
   }
@@ -1851,7 +1882,9 @@ class Image {
       );
     }
     assert(!_image._disposed);
-    return Image._(_image, width, height);
+    final Image image = Image._(_image, width, height);
+    image.disposeCallback = disposeCallback;
+    return image;
   }
 
   /// Returns true if `other` is a [clone] of this and thus shares the same
@@ -1878,6 +1911,12 @@ class _Image extends NativeFieldWrapperClass1 {
   // use the ImageDescriptor API.
   @pragma('vm:entry-point')
   _Image._();
+
+  @FfiNative<Handle Function(Int64, Int32, Int32)>('Image::CreateFromTextureID')
+  external static _Image createFromTextureId(int textureId, int width, int height);
+
+  @FfiNative<Handle Function(Int64, Int32, Int32)>('Image::CreateFromTexturePointer')
+  external static _Image createFromTexturePointer(int texturePointer, int width, int height);
 
   @FfiNative<Int32 Function(Pointer<Void>)>('Image::width', isLeaf: true)
   external int get width;
@@ -4319,9 +4358,9 @@ class FragmentShader extends Shader {
   ///
   /// All the sampler uniforms that a shader expects must be provided or the
   /// results will be undefined.
-  void setImageSampler(int index, Image image) {
+  void setImageSampler(int index, Image image, {FilterQuality filterQuality = FilterQuality.none}) {
     assert(!debugDisposed, 'Tried to access uniforms on a disposed Shader: $this');
-    _setImageSampler(index, image._image);
+    _setImageSampler(index, image._image, filterQuality.index);
   }
 
   /// Releases the native resources held by the [FragmentShader].
@@ -4339,8 +4378,8 @@ class FragmentShader extends Shader {
   @FfiNative<Handle Function(Handle, Handle, Handle, Handle)>('ReusableFragmentShader::Create')
   external Float32List _constructor(FragmentProgram program, int floatUniforms, int samplerUniforms);
 
-  @FfiNative<Void Function(Pointer<Void>, Handle, Handle)>('ReusableFragmentShader::SetImageSampler')
-  external void _setImageSampler(int index, _Image sampler);
+  @FfiNative<Void Function(Pointer<Void>, Handle, Handle, Int32)>('ReusableFragmentShader::SetImageSampler')
+  external void _setImageSampler(int index, _Image sampler, int filterQualityIndex);
 
   @FfiNative<Bool Function(Pointer<Void>)>('ReusableFragmentShader::ValidateSamplers')
   external bool _validateSamplers();
@@ -6348,6 +6387,40 @@ class ImageDescriptor extends NativeFieldWrapperClass1 {
 
   @FfiNative<Void Function(Pointer<Void>, Handle, Int32, Int32)>('ImageDescriptor::instantiateCodec')
   external void _instantiateCodec(Codec outCodec, int targetWidth, int targetHeight);
+}
+
+class RenderSurface extends NativeFieldWrapperClass1 {
+  RenderSurface._(int rawTexture) {
+    _constructor(rawTexture);
+  }
+
+  static Future<RenderSurface> fromTexture(int rawTexture, int width, int height) {
+    final Completer<RenderSurface> completer = Completer<RenderSurface>();
+    final RenderSurface renderSurface = RenderSurface._(rawTexture);
+    renderSurface._setup(width, height, () { completer.complete(renderSurface); });
+    return completer.future;
+  }
+
+  @FfiNative<Void Function(Handle, Int64)>('RenderSurface::Create')
+  external void _constructor(int rawTexture);
+
+  bool get isValid => _isValid();
+
+  @FfiNative<Bool Function(Pointer<Void>)>('RenderSurface::is_valid')
+  external bool _isValid();
+
+  @FfiNative<Void Function(Pointer<Void>, Int32, Int32, Handle)>('RenderSurface::setup')
+  external void _setup(int width, int height, VoidCallback callback);
+
+  Future<void> dispose() async {
+    final Completer<void> completer = Completer<void>();
+    _dispose(() => completer.complete());
+    return completer.future;
+  }
+
+  @FfiNative<Void Function(Pointer<Void>, Handle)>('RenderSurface::dispose')
+  external void _dispose(VoidCallback callback);
+
 }
 
 /// Generic callback signature, used by [_futurize].

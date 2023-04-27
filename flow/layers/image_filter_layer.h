@@ -5,25 +5,29 @@
 #ifndef FLUTTER_FLOW_LAYERS_IMAGE_FILTER_LAYER_H_
 #define FLUTTER_FLOW_LAYERS_IMAGE_FILTER_LAYER_H_
 
+#include <memory>
 #include "flutter/flow/layers/cacheable_layer.h"
 #include "flutter/flow/layers/layer.h"
+#include "include/core/SkRefCnt.h"
 #include "third_party/skia/include/core/SkImageFilter.h"
 
 namespace flutter {
 
 class ImageFilterLayer : public CacheableContainerLayer {
  public:
-  explicit ImageFilterLayer(sk_sp<SkImageFilter> filter);
+  explicit ImageFilterLayer(std::shared_ptr<const DlImageFilter> filter,
+                            const SkPoint& offset = SkPoint::Make(0, 0));
 
   void Diff(DiffContext* context, const Layer* old_layer) override;
 
-  void Preroll(PrerollContext* context, const SkMatrix& matrix) override;
+  void Preroll(PrerollContext* context) override;
 
   void Paint(PaintContext& context) const override;
 
  private:
-  sk_sp<SkImageFilter> filter_;
-  sk_sp<SkImageFilter> transformed_filter_;
+  SkPoint offset_;
+  std::shared_ptr<const DlImageFilter> filter_;
+  std::shared_ptr<const DlImageFilter> transformed_filter_;
 
   FML_DISALLOW_COPY_AND_ASSIGN(ImageFilterLayer);
 };

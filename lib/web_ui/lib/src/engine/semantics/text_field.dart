@@ -21,6 +21,11 @@ import 'semantics.dart';
 /// This class is still responsible for hooking up the DOM element with the
 /// [HybridTextEditing] instance so that changes are communicated to Flutter.
 class SemanticsTextEditingStrategy extends DefaultTextEditingStrategy {
+  /// Creates a [SemanticsTextEditingStrategy] that eagerly instantiates
+  /// [domElement] so the caller can insert it before calling
+  /// [SemanticsTextEditingStrategy.enable].
+  SemanticsTextEditingStrategy(super.owner);
+
   /// Initializes the [SemanticsTextEditingStrategy] singleton.
   ///
   /// This method must be called prior to accessing [instance].
@@ -34,12 +39,6 @@ class SemanticsTextEditingStrategy extends DefaultTextEditingStrategy {
   /// The [SemanticsTextEditingStrategy] singleton.
   static SemanticsTextEditingStrategy get instance => _instance!;
   static SemanticsTextEditingStrategy? _instance;
-
-  /// Creates a [SemanticsTextEditingStrategy] that eagerly instantiates
-  /// [domElement] so the caller can insert it before calling
-  /// [SemanticsTextEditingStrategy.enable].
-  SemanticsTextEditingStrategy(HybridTextEditing owner)
-      : super(owner);
 
   /// The text field whose DOM element is currently used for editing.
   ///
@@ -253,11 +252,7 @@ class TextField extends RoleManager {
 
     switch (browserEngine) {
       case BrowserEngine.blink:
-      case BrowserEngine.samsung:
-      case BrowserEngine.edge:
-      case BrowserEngine.ie11:
       case BrowserEngine.firefox:
-      case BrowserEngine.unknown:
         _initializeForBlink();
         break;
       case BrowserEngine.webkit:
@@ -293,24 +288,24 @@ class TextField extends RoleManager {
       _initializeForBlink();
       return;
     }
-    num? lastTouchStartOffsetX;
-    num? lastTouchStartOffsetY;
+    num? lastPointerDownOffsetX;
+    num? lastPointerDownOffsetY;
 
-    editableElement.addEventListener('touchstart',
+    editableElement.addEventListener('pointerdown',
         allowInterop((DomEvent event) {
-          final DomTouchEvent touchEvent = event as DomTouchEvent;
-          lastTouchStartOffsetX = touchEvent.changedTouches!.last.clientX;
-          lastTouchStartOffsetY = touchEvent.changedTouches!.last.clientY;
+          final DomPointerEvent pointerEvent = event as DomPointerEvent;
+          lastPointerDownOffsetX = pointerEvent.clientX;
+          lastPointerDownOffsetY = pointerEvent.clientY;
         }), true);
 
     editableElement.addEventListener(
-        'touchend', allowInterop((DomEvent event) {
-      final DomTouchEvent touchEvent = event as DomTouchEvent;
+        'pointerup', allowInterop((DomEvent event) {
+      final DomPointerEvent pointerEvent = event as DomPointerEvent;
 
-      if (lastTouchStartOffsetX != null) {
-        assert(lastTouchStartOffsetY != null);
-        final num offsetX = touchEvent.changedTouches!.last.clientX;
-        final num offsetY = touchEvent.changedTouches!.last.clientY;
+      if (lastPointerDownOffsetX != null) {
+        assert(lastPointerDownOffsetY != null);
+        final num deltaX = pointerEvent.clientX - lastPointerDownOffsetX!;
+        final num deltaY = pointerEvent.clientY - lastPointerDownOffsetY!;
 
         // This should match the similar constant defined in:
         //
@@ -319,17 +314,30 @@ class TextField extends RoleManager {
         // The value is pre-squared so we have to do less math at runtime.
         const double kTouchSlop = 18.0 * 18.0; // Logical pixels squared
 
-        if (offsetX * offsetX + offsetY * offsetY < kTouchSlop) {
+        if (deltaX * deltaX + deltaY * deltaY < kTouchSlop) {
           // Recognize it as a tap that requires a keyboard.
           EnginePlatformDispatcher.instance.invokeOnSemanticsAction(
               semanticsObject.id, ui.SemanticsAction.tap, null);
+
+          // We need to call focus for the following scenario:
+          // 1. The virtial keyboard in iOS gets dismissed by the 'Done' button
+          // located at the top right of the keyboard.
+          // 2. The user tries to focus on the input field again, either by
+          // VoiceOver or manually, but the keyboard does not show up.
+          //
+          // In this scenario, the Flutter framework does not send a semantic update,
+          // so we need to call focus after detecting a tap to make sure that the
+          // virtual keyboard will show.
+          if (semanticsObject.hasFocus) {
+            editableElement.focus();
+          }
         }
       } else {
-        assert(lastTouchStartOffsetY == null);
+        assert(lastPointerDownOffsetY == null);
       }
 
-      lastTouchStartOffsetX = null;
-      lastTouchStartOffsetY = null;
+      lastPointerDownOffsetX = null;
+      lastPointerDownOffsetY = null;
     }), true);
   }
 

@@ -21,8 +21,9 @@ namespace flutter {
 class AndroidSurfaceGLSkia final : public GPUSurfaceGLDelegate,
                                    public AndroidSurface {
  public:
-  AndroidSurfaceGLSkia(const std::shared_ptr<AndroidContext>& android_context,
-                       std::shared_ptr<PlatformViewAndroidJNI> jni_facade);
+  AndroidSurfaceGLSkia(
+      const std::shared_ptr<AndroidContext>& android_context,
+      const std::shared_ptr<PlatformViewAndroidJNI>& jni_facade);
 
   ~AndroidSurfaceGLSkia() override;
 
@@ -67,7 +68,7 @@ class AndroidSurfaceGLSkia final : public GPUSurfaceGLDelegate,
   bool GLContextPresent(const GLPresentInfo& present_info) override;
 
   // |GPUSurfaceGLDelegate|
-  intptr_t GLContextFBO(GLFrameInfo frame_info) const override;
+  GLFBOInfo GLContextFBO(GLFrameInfo frame_info) const override;
 
   // |GPUSurfaceGLDelegate|
   sk_sp<const GrGLInterface> GetGLInterface() const override;

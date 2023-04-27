@@ -20,6 +20,7 @@
 #include "flutter/shell/platform/linux/fl_scrolling_manager.h"
 #include "flutter/shell/platform/linux/fl_scrolling_view_delegate.h"
 #include "flutter/shell/platform/linux/fl_text_input_plugin.h"
+#include "flutter/shell/platform/linux/fl_text_input_view_delegate.h"
 #include "flutter/shell/platform/linux/fl_view_accessible.h"
 #include "flutter/shell/platform/linux/public/flutter_linux/fl_engine.h"
 #include "flutter/shell/platform/linux/public/flutter_linux/fl_plugin_registry.h"
@@ -63,6 +64,7 @@ struct _FlView {
   /* FlKeyboardViewDelegate related properties */
   KeyboardLayoutNotifier keyboard_layout_notifier;
   GdkKeymap* keymap;
+  gulong keymap_keys_changed_cb_id;  // Signal connection ID.
 };
 
 typedef struct _FlViewChild {
@@ -81,6 +83,9 @@ static void fl_view_keyboard_delegate_iface_init(
 static void fl_view_scrolling_delegate_iface_init(
     FlScrollingViewDelegateInterface* iface);
 
+static void fl_view_text_input_delegate_iface_init(
+    FlTextInputViewDelegateInterface* iface);
+
 G_DEFINE_TYPE_WITH_CODE(
     FlView,
     fl_view,
@@ -90,18 +95,22 @@ G_DEFINE_TYPE_WITH_CODE(
         G_IMPLEMENT_INTERFACE(fl_keyboard_view_delegate_get_type(),
                               fl_view_keyboard_delegate_iface_init)
             G_IMPLEMENT_INTERFACE(fl_scrolling_view_delegate_get_type(),
-                                  fl_view_scrolling_delegate_iface_init))
+                                  fl_view_scrolling_delegate_iface_init)
+                G_IMPLEMENT_INTERFACE(fl_text_input_view_delegate_get_type(),
+                                      fl_view_text_input_delegate_iface_init))
 
 // Initialize keyboard manager.
 static void init_keyboard(FlView* self) {
   FlBinaryMessenger* messenger = fl_engine_get_binary_messenger(self->engine);
 
-  GdkWindow* window = gtk_widget_get_window(GTK_WIDGET(self));
+  GdkWindow* window =
+      gtk_widget_get_window(gtk_widget_get_toplevel(GTK_WIDGET(self)));
   g_return_if_fail(GDK_IS_WINDOW(window));
   g_autoptr(GtkIMContext) im_context = gtk_im_multicontext_new();
   gtk_im_context_set_client_window(im_context, window);
 
-  self->text_input_plugin = fl_text_input_plugin_new(messenger, im_context);
+  self->text_input_plugin = fl_text_input_plugin_new(
+      messenger, im_context, FL_TEXT_INPUT_VIEW_DELEGATE(self));
   self->keyboard_manager =
       fl_keyboard_manager_new(FL_KEYBOARD_VIEW_DELEGATE(self));
 }
@@ -155,6 +164,8 @@ static gboolean send_pointer_button_event(FlView* self, GdkEventButton* event) {
   fl_scrolling_manager_set_last_mouse_position(self->scrolling_manager,
                                                event->x * scale_factor,
                                                event->y * scale_factor);
+  fl_keyboard_manager_sync_modifier_if_needed(self->keyboard_manager,
+                                              event->state, event->time);
   fl_engine_send_mouse_pointer_event(
       self->engine, phase, event->time * kMicrosecondsPerMillisecond,
       event->x * scale_factor, event->y * scale_factor, 0, 0,
@@ -163,7 +174,7 @@ static gboolean send_pointer_button_event(FlView* self, GdkEventButton* event) {
   return TRUE;
 }
 
-// Geneartes a mouse pointer event if the pointer appears inside the window.
+// Generates a mouse pointer event if the pointer appears inside the window.
 static void check_pointer_inside(FlView* view, GdkEvent* event) {
   if (!view->pointer_inside) {
     view->pointer_inside = TRUE;
@@ -213,8 +224,9 @@ static void add_pending_child(FlView* self,
 static GList* find_child(GList* list, GtkWidget* widget) {
   for (GList* i = list; i; i = i->next) {
     FlViewChild* child = reinterpret_cast<FlViewChild*>(i->data);
-    if (child && child->widget == widget)
+    if (child && child->widget == widget) {
       return i;
+    }
   }
   return nullptr;
 }
@@ -301,6 +313,7 @@ static void fl_view_keyboard_delegate_iface_init(
   iface->lookup_key = [](FlKeyboardViewDelegate* view_delegate,
                          const GdkKeymapKey* key) -> guint {
     FlView* self = FL_VIEW(view_delegate);
+    g_return_val_if_fail(self->keymap != nullptr, 0);
     return gdk_keymap_lookup_key(self->keymap, key);
   };
 }
@@ -329,6 +342,18 @@ static void fl_view_scrolling_delegate_iface_init(
                                                 rotation);
         };
       };
+}
+
+static void fl_view_text_input_delegate_iface_init(
+    FlTextInputViewDelegateInterface* iface) {
+  iface->translate_coordinates = [](FlTextInputViewDelegate* delegate,
+                                    gint view_x, gint view_y, gint* window_x,
+                                    gint* window_y) {
+    FlView* self = FL_VIEW(delegate);
+    gtk_widget_translate_coordinates(GTK_WIDGET(self),
+                                     gtk_widget_get_toplevel(GTK_WIDGET(self)),
+                                     view_x, view_y, window_x, window_y);
+  };
 }
 
 // Signal handler for GtkWidget::button-press-event
@@ -379,6 +404,9 @@ static gboolean motion_notify_event_cb(GtkWidget* widget,
   check_pointer_inside(view, reinterpret_cast<GdkEvent*>(event));
 
   gint scale_factor = gtk_widget_get_scale_factor(GTK_WIDGET(view));
+
+  fl_keyboard_manager_sync_modifier_if_needed(view->keyboard_manager,
+                                              event->state, event->time);
   fl_engine_send_mouse_pointer_event(
       view->engine, view->button_state != 0 ? kMove : kHover,
       event->time * kMicrosecondsPerMillisecond, event->x * scale_factor,
@@ -509,8 +537,8 @@ static void fl_view_constructed(GObject* object) {
                    G_CALLBACK(enter_notify_event_cb), self);
   g_signal_connect(self->event_box, "leave-notify-event",
                    G_CALLBACK(leave_notify_event_cb), self);
-  g_signal_connect(self->keymap, "keys-changed",
-                   G_CALLBACK(keymap_keys_changed_cb), self);
+  self->keymap_keys_changed_cb_id = g_signal_connect(
+      self->keymap, "keys-changed", G_CALLBACK(keymap_keys_changed_cb), self);
   GtkGesture* zoom = gtk_gesture_zoom_new(self->event_box);
   g_signal_connect(zoom, "begin", G_CALLBACK(gesture_zoom_begin_cb), self);
   g_signal_connect(zoom, "scale-changed", G_CALLBACK(gesture_zoom_update_cb),
@@ -584,6 +612,10 @@ static void fl_view_dispose(GObject* object) {
   g_clear_object(&self->engine);
   g_clear_object(&self->accessibility_plugin);
   g_clear_object(&self->keyboard_manager);
+  if (self->keymap_keys_changed_cb_id != 0) {
+    g_signal_handler_disconnect(self->keymap, self->keymap_keys_changed_cb_id);
+    self->keymap_keys_changed_cb_id = 0;
+  }
   g_clear_object(&self->mouse_cursor_plugin);
   g_clear_object(&self->platform_plugin);
   g_list_free_full(self->gl_area_list, g_object_unref);

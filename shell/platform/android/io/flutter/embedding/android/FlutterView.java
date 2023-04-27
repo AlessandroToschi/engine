@@ -1293,7 +1293,7 @@ public class FlutterView extends FrameLayout
       flutterImageView.closeImageReader();
       // Remove the FlutterImageView that was previously added by {@code convertToImageView} to
       // avoid leaks when this FlutterView is reused later in the scenario where multiple
-      // FlutterActivitiy/FlutterFragment share one engine.
+      // FlutterActivity/FlutterFragment share one engine.
       removeView(flutterImageView);
       flutterImageView = null;
     }
@@ -1306,6 +1306,11 @@ public class FlutterView extends FrameLayout
   public FlutterImageView createImageView() {
     return new FlutterImageView(
         getContext(), getWidth(), getHeight(), FlutterImageView.SurfaceKind.background);
+  }
+
+  @VisibleForTesting
+  public FlutterImageView getCurrentImageSurface() {
+    return flutterImageView;
   }
 
   /**
@@ -1370,7 +1375,7 @@ public class FlutterView extends FrameLayout
           public void onFlutterUiDisplayed() {
             renderer.removeIsDisplayingFlutterUiListener(this);
             onDone.run();
-            if (!(renderSurface instanceof FlutterImageView)) {
+            if (!(renderSurface instanceof FlutterImageView) && flutterImageView != null) {
               flutterImageView.detachFromRenderer();
             }
           }
@@ -1515,6 +1520,17 @@ public class FlutterView extends FrameLayout
   @Override
   public void autofill(@NonNull SparseArray<AutofillValue> values) {
     textInputPlugin.autofill(values);
+  }
+
+  @Override
+  public void setVisibility(int visibility) {
+    super.setVisibility(visibility);
+    // For `FlutterSurfaceView`, setting visibility to the current `FlutterView` will not take
+    // effect since it is not in the view tree. So override this method and set the surfaceView.
+    // See https://github.com/flutter/flutter/issues/105203
+    if (renderSurface instanceof FlutterSurfaceView) {
+      ((FlutterSurfaceView) renderSurface).setVisibility(visibility);
+    }
   }
 
   /**

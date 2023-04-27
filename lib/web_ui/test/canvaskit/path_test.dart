@@ -19,7 +19,7 @@ void testMain() {
     setUpCanvasKitTest();
 
     test('Using CanvasKit', () {
-      expect(useCanvasKit, isTrue);
+      expect(renderer is CanvasKitRenderer, isTrue);
     });
 
     test(CkPathMetrics, () {
@@ -44,12 +44,6 @@ void testMain() {
 
       path.addOval(const ui.Rect.fromLTRB(10, 10, 100, 100));
       expect(path.computeMetrics().length, 2);
-
-      // Path metrics can be iterated over multiple times.
-      final ui.PathMetrics metrics = path.computeMetrics();
-      expect(metrics.toList().length, 2);
-      expect(metrics.toList().length, 2);
-      expect(metrics.toList().length, 2);
 
       // Can simultaneously iterate over multiple metrics from the same path.
       final ui.PathMetrics metrics1 = path.computeMetrics();
@@ -190,7 +184,5 @@ void testMain() {
       expect(original.getBounds(), rect1);
       expect(copy.getBounds(), rect1.expandToInclude(rect2));
     });
-  },
-      skip:
-          isIosSafari); // TODO(hterkelsen): https://github.com/flutter/flutter/issues/60040
+  });
 }

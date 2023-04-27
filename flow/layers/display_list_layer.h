@@ -36,12 +36,17 @@ class DisplayListLayer : public Layer {
     return this;
   }
 
-  void Preroll(PrerollContext* frame, const SkMatrix& matrix) override;
+  void Preroll(PrerollContext* frame) override;
 
   void Paint(PaintContext& context) const override;
 
   const DisplayListRasterCacheItem* raster_cache_item() const {
     return display_list_raster_cache_item_.get();
+  }
+
+  RasterCacheKeyID caching_key_id() const override {
+    return RasterCacheKeyID(display_list()->unique_id(),
+                            RasterCacheKeyType::kDisplayList);
   }
 
  private:

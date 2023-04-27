@@ -5,11 +5,14 @@
 #include "impeller/renderer/backend/metal/texture_mtl.h"
 
 #include "impeller/base/validation.h"
+#include "impeller/renderer/texture_descriptor.h"
 
 namespace impeller {
 
-TextureMTL::TextureMTL(TextureDescriptor p_desc, id<MTLTexture> texture)
-    : Texture(std::move(p_desc)), texture_(texture) {
+TextureMTL::TextureMTL(TextureDescriptor p_desc,
+                       id<MTLTexture> texture,
+                       bool wrapped)
+    : Texture(p_desc), texture_(texture) {
   const auto& desc = GetTextureDescriptor();
 
   if (!desc.IsValid() || !texture_) {
@@ -21,7 +24,21 @@ TextureMTL::TextureMTL(TextureDescriptor p_desc, id<MTLTexture> texture)
     return;
   }
 
+  is_wrapped_ = wrapped;
   is_valid_ = true;
+}
+
+std::shared_ptr<TextureMTL> TextureMTL::Wrapper(TextureDescriptor desc,
+                                                id<MTLTexture> texture) {
+  return std::make_shared<TextureMTL>(desc, texture, true);
+}
+
+std::shared_ptr<TextureMTL> TextureMTL::TexturePointerWrapper(
+    TextureDescriptor desc,
+    int64_t texture_pointer) {
+  id<MTLTexture> texture =
+      (__bridge id)(reinterpret_cast<void*>(texture_pointer));
+  return TextureMTL::Wrapper(desc, texture);
 }
 
 TextureMTL::~TextureMTL() = default;
@@ -42,7 +59,7 @@ bool TextureMTL::OnSetContents(std::shared_ptr<const fml::Mapping> mapping,
 bool TextureMTL::OnSetContents(const uint8_t* contents,
                                size_t length,
                                size_t slice) {
-  if (!IsValid() || !contents) {
+  if (!IsValid() || !contents || is_wrapped_) {
     return false;
   }
 
@@ -81,6 +98,10 @@ id<MTLTexture> TextureMTL::GetMTLTexture() const {
 
 bool TextureMTL::IsValid() const {
   return is_valid_;
+}
+
+bool TextureMTL::IsWrapped() const {
+  return is_wrapped_;
 }
 
 }  // namespace impeller

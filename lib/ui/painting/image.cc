@@ -7,36 +7,25 @@
 #include <algorithm>
 #include <limits>
 
+#include "flutter/lib/ui/painting/display_list_deferred_image_gpu_skia.h"
 #include "flutter/lib/ui/painting/image_encoding.h"
+#include "flutter/lib/ui/ui_dart_state.h"
 #include "third_party/tonic/converter/dart_converter.h"
 #include "third_party/tonic/dart_args.h"
 #include "third_party/tonic/dart_binding_macros.h"
 #include "third_party/tonic/dart_library_natives.h"
+#if IMPELLER_SUPPORTS_RENDERING
+#include "flutter/lib/ui/painting/display_list_deferred_image_gpu_impeller.h"
+#endif  // IMPELLER_SUPPORTS_RENDERING
 
 namespace flutter {
 
 typedef CanvasImage Image;
 
 // Since _Image is a private class, we can't use IMPLEMENT_WRAPPERTYPEINFO
-static const tonic::DartWrapperInfo kDartWrapperInfo_ui_Image = {
-    "ui",
-    "_Image",
-    sizeof(Image),
-};
+static const tonic::DartWrapperInfo kDartWrapperInfoUIImage("ui", "_Image");
 const tonic::DartWrapperInfo& Image::dart_wrapper_info_ =
-    kDartWrapperInfo_ui_Image;
-
-#define FOR_EACH_BINDING(V) \
-  V(Image, width)           \
-  V(Image, height)          \
-  V(Image, toByteData)      \
-  V(Image, dispose)
-
-FOR_EACH_BINDING(DART_NATIVE_CALLBACK)
-
-void CanvasImage::RegisterNatives(tonic::DartLibraryNatives* natives) {
-  natives->Register({FOR_EACH_BINDING(DART_REGISTER_NATIVE)});
-}
+    kDartWrapperInfoUIImage;
 
 CanvasImage::CanvasImage() = default;
 
@@ -51,16 +40,64 @@ void CanvasImage::dispose() {
   ClearDartWrapper();
 }
 
-size_t CanvasImage::GetAllocationSize() const {
-  auto size = sizeof(this);
-  if (image_) {
-    size += image_->GetApproximateByteSize();
+static sk_sp<DlImage> CreateDeferredImageFromTexture(
+    bool impeller,
+    int64_t raw_texture,
+    const SkISize& size,
+    fml::TaskRunnerAffineWeakPtr<SnapshotDelegate> snapshot_delegate,
+    fml::RefPtr<fml::TaskRunner> raster_task_runner,
+    fml::RefPtr<SkiaUnrefQueue> unref_queue) {
+#if IMPELLER_SUPPORTS_RENDERING
+  if (impeller) {
+    return DlDeferredImageGPUImpeller::MakeFromTexture(
+        raw_texture, size, std::move(snapshot_delegate),
+        std::move(raster_task_runner));
   }
-  // The VM will assert if we set a value larger than or close to
-  // std::numeric_limits<intptr_t>::max().
-  // https://github.com/dart-lang/sdk/issues/49332
-  return std::clamp(
-      size, static_cast<size_t>(0),
-      static_cast<size_t>(std::numeric_limits<intptr_t>::max() / 10));
+#endif  // IMPELLER_SUPPORTS_RENDERING
+  return DlDeferredImageGPUSkia::MakeFromTexture(
+      raw_texture, size, std::move(snapshot_delegate), raster_task_runner,
+      std::move(unref_queue));
+}
+
+fml::RefPtr<flutter::CanvasImage> flutter::CanvasImage::CreateFromTextureID(
+    int64_t texture_id,
+    int32_t width,
+    int32_t height) {
+  auto* dart_state = UIDartState::Current();
+  if (!dart_state) {
+    return nullptr;
+  }
+  auto unref_queue = dart_state->GetSkiaUnrefQueue();
+  auto snapshot_delegate = dart_state->GetSnapshotDelegate();
+  auto raster_task_runner = dart_state->GetTaskRunners().GetRasterTaskRunner();
+
+  auto image = CanvasImage::Create();
+  auto dl_image = CreateDeferredImageFromTexture(
+      dart_state->IsImpellerEnabled(), texture_id, SkISize::Make(width, height),
+      std::move(snapshot_delegate), std::move(raster_task_runner),
+      std::move(unref_queue));
+  image->set_image(dl_image);
+  return image;
+}
+
+fml::RefPtr<flutter::CanvasImage>
+flutter::CanvasImage::CreateFromTexturePointer(int64_t texture_pointer,
+                                               int32_t width,
+                                               int32_t height) {
+  auto* dart_state = UIDartState::Current();
+  if (!dart_state) {
+    return nullptr;
+  }
+  auto unref_queue = dart_state->GetSkiaUnrefQueue();
+  auto snapshot_delegate = dart_state->GetSnapshotDelegate();
+  auto raster_task_runner = dart_state->GetTaskRunners().GetRasterTaskRunner();
+
+  auto image = CanvasImage::Create();
+  auto dl_image = CreateDeferredImageFromTexture(
+      dart_state->IsImpellerEnabled(), texture_pointer,
+      SkISize::Make(width, height), std::move(snapshot_delegate),
+      std::move(raster_task_runner), std::move(unref_queue));
+  image->set_image(dl_image);
+  return image;
 }
 }  // namespace flutter

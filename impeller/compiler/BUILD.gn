@@ -8,6 +8,10 @@ import("//flutter/shell/version/version.gni")
 impeller_component("compiler_lib") {
   include_dirs = [ "//third_party/vulkan-deps/spirv-cross/src/" ]
 
+  # Current versions of libcxx have deprecated some of the UTF-16 string
+  # conversion APIs.
+  defines = [ "_LIBCPP_DISABLE_DEPRECATION_WARNINGS" ]
+
   sources = [
     "code_gen_template.h",
     "compiler.cc",
@@ -24,6 +28,8 @@ impeller_component("compiler_lib") {
     "runtime_stage_data.h",
     "source_options.cc",
     "source_options.h",
+    "spirv_sksl.cc",
+    "spirv_sksl.h",
     "switches.cc",
     "switches.h",
     "types.cc",
@@ -88,7 +94,10 @@ impeller_component("impellerc") {
 
   sources = [ "impellerc_main.cc" ]
 
-  deps = [ ":compiler_lib" ]
+  deps = [
+    ":compiler_lib",
+    "shader_lib",
+  ]
 
   metadata = {
     entitlement_file_path = [ "impellerc" ]
@@ -111,6 +120,7 @@ impeller_component("compiler_unittests") {
     "compiler_test.cc",
     "compiler_test.h",
     "compiler_unittests.cc",
+    "switches_unittests.cc",
   ]
 
   deps = [

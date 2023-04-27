@@ -13,6 +13,10 @@
 #include "flutter/fml/make_copyable.h"
 #include "flutter/fml/trace_event.h"
 #include "flutter/lib/ui/painting/image.h"
+#if IMPELLER_SUPPORTS_RENDERING
+#include "flutter/lib/ui/painting/image_encoding_impeller.h"
+#endif  // IMPELLER_SUPPORTS_RENDERING
+#include "flutter/lib/ui/painting/image_encoding_skia.h"
 #include "third_party/skia/include/core/SkEncodedImageFormat.h"
 #include "third_party/tonic/dart_persistent_value.h"
 #include "third_party/tonic/logging/dart_invoke.h"
@@ -22,6 +26,9 @@ using tonic::DartInvoke;
 using tonic::DartPersistentValue;
 using tonic::ToDart;
 
+namespace impeller {
+class Context;
+}  // namespace impeller
 namespace flutter {
 namespace {
 
@@ -60,93 +67,7 @@ void InvokeDataCallback(std::unique_ptr<DartPersistentValue> callback,
   DartInvoke(callback->value(), {dart_data});
 }
 
-static void ConvertGpuImageToRaster(
-    sk_sp<DlImage> dl_image,
-    std::function<void(sk_sp<SkImage>)> encode_task,
-    fml::RefPtr<fml::TaskRunner> raster_task_runner) {
-  fml::TaskRunner::RunNowOrPostTask(
-      raster_task_runner, [dl_image, encode_task = std::move(encode_task)]() {
-        auto image = dl_image->skia_image();
-        if (image == nullptr) {
-          encode_task(nullptr);
-          return;
-        }
-        encode_task(image->makeRasterImage());
-      });
-}
-
-void ConvertImageToRaster(
-    sk_sp<DlImage> dl_image,
-    std::function<void(sk_sp<SkImage>)> encode_task,
-    fml::RefPtr<fml::TaskRunner> raster_task_runner,
-    fml::RefPtr<fml::TaskRunner> io_task_runner,
-    fml::WeakPtr<GrDirectContext> resource_context,
-    fml::WeakPtr<SnapshotDelegate> snapshot_delegate,
-    const std::shared_ptr<const fml::SyncSwitch>& is_gpu_disabled_sync_switch) {
-  auto image = dl_image->skia_image();
-
-  // Check validity of the image.
-  if (image == nullptr) {
-    FML_LOG(ERROR) << "Image was null.";
-    encode_task(nullptr);
-    return;
-  }
-
-  auto dimensions = image->dimensions();
-
-  if (dimensions.isEmpty()) {
-    FML_LOG(ERROR) << "Image dimensions were empty.";
-    encode_task(nullptr);
-    return;
-  }
-
-  SkPixmap pixmap;
-  if (image->peekPixels(&pixmap)) {
-    // This is already a raster image.
-    encode_task(image);
-    return;
-  }
-
-  if (sk_sp<SkImage> raster_image = image->makeRasterImage()) {
-    // The image can be converted to a raster image.
-    encode_task(raster_image);
-    return;
-  }
-
-  // Cross-context images do not support makeRasterImage. Convert these images
-  // by drawing them into a surface.  This must be done on the raster thread
-  // to prevent concurrent usage of the image on both the IO and raster threads.
-  raster_task_runner->PostTask([image, encode_task = std::move(encode_task),
-                                resource_context, snapshot_delegate,
-                                io_task_runner, is_gpu_disabled_sync_switch]() {
-    if (!snapshot_delegate) {
-      io_task_runner->PostTask(
-          [encode_task = std::move(encode_task)]() mutable {
-            encode_task(nullptr);
-          });
-      return;
-    }
-
-    sk_sp<SkImage> raster_image =
-        snapshot_delegate->ConvertToRasterImage(image);
-
-    io_task_runner->PostTask([image, encode_task = std::move(encode_task),
-                              raster_image = std::move(raster_image),
-                              resource_context,
-                              is_gpu_disabled_sync_switch]() mutable {
-      if (!raster_image) {
-        // The rasterizer was unable to render the cross-context image
-        // (presumably because it does not have a GrContext).  In that case,
-        // convert the image on the IO thread using the resource context.
-        raster_image = ConvertToRasterUsingResourceContext(
-            image, resource_context, is_gpu_disabled_sync_switch);
-      }
-      encode_task(raster_image);
-    });
-  });
-}
-
-sk_sp<SkData> CopyImageByteData(sk_sp<SkImage> raster_image,
+sk_sp<SkData> CopyImageByteData(const sk_sp<SkImage>& raster_image,
                                 SkColorType color_type,
                                 SkAlphaType alpha_type) {
   FML_DCHECK(raster_image);
@@ -183,7 +104,8 @@ sk_sp<SkData> CopyImageByteData(sk_sp<SkImage> raster_image,
   return SkData::MakeWithCopy(pixmap.addr(), pixmap.computeByteSize());
 }
 
-sk_sp<SkData> EncodeImage(sk_sp<SkImage> raster_image, ImageByteFormat format) {
+sk_sp<SkData> EncodeImage(const sk_sp<SkImage>& raster_image,
+                          ImageByteFormat format) {
   TRACE_EVENT0("flutter", __FUNCTION__);
 
   if (!raster_image) {
@@ -220,41 +142,45 @@ sk_sp<SkData> EncodeImage(sk_sp<SkImage> raster_image, ImageByteFormat format) {
 }
 
 void EncodeImageAndInvokeDataCallback(
-    sk_sp<DlImage> image,
+    const sk_sp<DlImage>& image,
     std::unique_ptr<DartPersistentValue> callback,
     ImageByteFormat format,
-    fml::RefPtr<fml::TaskRunner> ui_task_runner,
-    fml::RefPtr<fml::TaskRunner> raster_task_runner,
-    fml::RefPtr<fml::TaskRunner> io_task_runner,
-    fml::WeakPtr<GrDirectContext> resource_context,
-    fml::WeakPtr<SnapshotDelegate> snapshot_delegate,
-    const std::shared_ptr<const fml::SyncSwitch>& is_gpu_disabled_sync_switch) {
+    const fml::RefPtr<fml::TaskRunner>& ui_task_runner,
+    const fml::RefPtr<fml::TaskRunner>& raster_task_runner,
+    const fml::RefPtr<fml::TaskRunner>& io_task_runner,
+    const fml::WeakPtr<GrDirectContext>& resource_context,
+    const fml::TaskRunnerAffineWeakPtr<SnapshotDelegate>& snapshot_delegate,
+    const std::shared_ptr<const fml::SyncSwitch>& is_gpu_disabled_sync_switch,
+    const std::shared_ptr<impeller::Context>& impeller_context,
+    bool is_impeller_enabled) {
   auto callback_task = fml::MakeCopyable(
       [callback = std::move(callback)](sk_sp<SkData> encoded) mutable {
         InvokeDataCallback(std::move(callback), std::move(encoded));
       });
-
+  // The static leak checker gets confused by the use of fml::MakeCopyable in
+  // EncodeImage.
+  // NOLINTNEXTLINE(clang-analyzer-cplusplus.NewDeleteLeaks)
   auto encode_task = [callback_task = std::move(callback_task), format,
-                      ui_task_runner](sk_sp<SkImage> raster_image) {
-    sk_sp<SkData> encoded = EncodeImage(std::move(raster_image), format);
-    ui_task_runner->PostTask([callback_task = std::move(callback_task),
+                      ui_task_runner](const sk_sp<SkImage>& raster_image) {
+    sk_sp<SkData> encoded = EncodeImage(raster_image, format);
+    ui_task_runner->PostTask([callback_task = callback_task,
                               encoded = std::move(encoded)]() mutable {
       callback_task(std::move(encoded));
     });
   };
 
   FML_DCHECK(image);
-  switch (image->owning_context()) {
-    case DlImage::OwningContext::kRaster:
-      ConvertGpuImageToRaster(std::move(image), encode_task,
-                              raster_task_runner);
-      break;
-    case DlImage::OwningContext::kIO:
-      ConvertImageToRaster(std::move(image), encode_task, raster_task_runner,
+#if IMPELLER_SUPPORTS_RENDERING
+  if (is_impeller_enabled) {
+    ConvertImageToRasterImpeller(image, encode_task, raster_task_runner,
+                                 io_task_runner, is_gpu_disabled_sync_switch,
+                                 impeller_context);
+    return;
+  }
+#endif  // IMPELLER_SUPPORTS_RENDERING
+  ConvertImageToRasterSkia(image, encode_task, raster_task_runner,
                            io_task_runner, resource_context, snapshot_delegate,
                            is_gpu_disabled_sync_switch);
-      break;
-  }
 }
 
 }  // namespace
@@ -277,20 +203,23 @@ Dart_Handle EncodeImage(CanvasImage* canvas_image,
 
   const auto& task_runners = UIDartState::Current()->GetTaskRunners();
 
+  // The static leak checker gets confused by the use of fml::MakeCopyable.
+  // NOLINTNEXTLINE(clang-analyzer-cplusplus.NewDeleteLeaks)
   task_runners.GetIOTaskRunner()->PostTask(fml::MakeCopyable(
       [callback = std::move(callback), image = canvas_image->image(),
        image_format, ui_task_runner = task_runners.GetUITaskRunner(),
        raster_task_runner = task_runners.GetRasterTaskRunner(),
        io_task_runner = task_runners.GetIOTaskRunner(),
        io_manager = UIDartState::Current()->GetIOManager(),
-       snapshot_delegate =
-           UIDartState::Current()->GetSnapshotDelegate()]() mutable {
+       snapshot_delegate = UIDartState::Current()->GetSnapshotDelegate(),
+       is_impeller_enabled =
+           UIDartState::Current()->IsImpellerEnabled()]() mutable {
         EncodeImageAndInvokeDataCallback(
-            std::move(image), std::move(callback), image_format,
-            std::move(ui_task_runner), std::move(raster_task_runner),
-            std::move(io_task_runner), io_manager->GetResourceContext(),
-            std::move(snapshot_delegate),
-            io_manager->GetIsGpuDisabledSyncSwitch());
+            image, std::move(callback), image_format, ui_task_runner,
+            raster_task_runner, io_task_runner,
+            io_manager->GetResourceContext(), snapshot_delegate,
+            io_manager->GetIsGpuDisabledSyncSwitch(),
+            io_manager->GetImpellerContext(), is_impeller_enabled);
       }));
 
   return Dart_Null();

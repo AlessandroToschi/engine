@@ -21,6 +21,7 @@ import '../text/paragraph.dart';
 import '../util.dart';
 import 'autofill_hint.dart';
 import 'composition_aware_mixin.dart';
+import 'input_action.dart';
 import 'input_type.dart';
 import 'text_capitalization.dart';
 
@@ -37,7 +38,6 @@ const int _kReturnKeyCode = 13;
 /// is autofilled.
 bool browserHasAutofillOverlay() =>
     browserEngine == BrowserEngine.blink ||
-    browserEngine == BrowserEngine.samsung ||
     browserEngine == BrowserEngine.webkit;
 
 /// `transparentTextEditing` class is configured to make the autofill overlay
@@ -59,6 +59,9 @@ void _setStaticStyleAttributes(DomHTMLElement domElement) {
 
   final DomCSSStyleDeclaration elementStyle = domElement.style;
   elementStyle
+    // Prevent (forced-colors: active) from making our invisible text fields visible.
+    // For more details, see: https://developer.mozilla.org/en-US/docs/Web/CSS/forced-color-adjust
+    ..setProperty('forced-color-adjust', 'none')
     ..whiteSpace = 'pre-wrap'
     ..alignContent = 'center'
     ..position = 'absolute'
@@ -69,19 +72,18 @@ void _setStaticStyleAttributes(DomHTMLElement domElement) {
     ..color = 'transparent'
     ..backgroundColor = 'transparent'
     ..background = 'transparent'
+    // This property makes the input's blinking cursor transparent.
+    ..caretColor = 'transparent'
     ..outline = 'none'
     ..border = 'none'
     ..resize = 'none'
-    ..textShadow = 'transparent'
+    ..textShadow = 'none'
     ..overflow = 'hidden'
     ..transformOrigin = '0 0 0';
 
   if (browserHasAutofillOverlay()) {
     domElement.classList.add(transparentTextEditingClass);
   }
-
-  // This property makes the input's blinking cursor transparent.
-  elementStyle.setProperty('caret-color', 'transparent');
 
   if (_debugVisibleTextEditing) {
     elementStyle
@@ -352,6 +354,24 @@ class AutofillInfo {
     this.placeholder,
   });
 
+  factory AutofillInfo.fromFrameworkMessage(Map<String, dynamic> autofill,
+      {TextCapitalizationConfig textCapitalization =
+          const TextCapitalizationConfig.defaultCapitalization()}) {
+    assert(autofill != null);
+    final String uniqueIdentifier = autofill.readString('uniqueIdentifier');
+    final List<dynamic>? hintsList = autofill.tryList('hints');
+    final String? firstHint = (hintsList == null || hintsList.isEmpty) ? null : hintsList.first as String;
+    final EditingState editingState =
+        EditingState.fromFrameworkMessage(autofill.readJson('editingValue'));
+    return AutofillInfo(
+      uniqueIdentifier: uniqueIdentifier,
+      autofillHint: (firstHint != null) ? BrowserAutofillHints.instance.flutterToEngine(firstHint) : null,
+      editingState: editingState,
+      placeholder: autofill.tryString('hintText'),
+      textCapitalization: textCapitalization,
+    );
+  }
+
   /// The current text and selection state of a text field.
   final EditingState editingState;
 
@@ -389,24 +409,6 @@ class AutofillInfo {
   /// can be a useful indication to the platform autofill service as to what
   /// information is expected in this field.
   final String? placeholder;
-
-  factory AutofillInfo.fromFrameworkMessage(Map<String, dynamic> autofill,
-      {TextCapitalizationConfig textCapitalization =
-          const TextCapitalizationConfig.defaultCapitalization()}) {
-    assert(autofill != null); // ignore: unnecessary_null_comparison
-    final String uniqueIdentifier = autofill.readString('uniqueIdentifier');
-    final List<dynamic>? hintsList = autofill.tryList('hints');
-    final String? firstHint = (hintsList == null || hintsList.isEmpty) ? null : hintsList.first as String;
-    final EditingState editingState =
-        EditingState.fromFrameworkMessage(autofill.readJson('editingValue'));
-    return AutofillInfo(
-      uniqueIdentifier: uniqueIdentifier,
-      autofillHint: (firstHint != null) ? BrowserAutofillHints.instance.flutterToEngine(firstHint) : null,
-      editingState: editingState,
-      placeholder: autofill.tryString('hintText'),
-      textCapitalization: textCapitalization,
-    );
-  }
 
   void applyToDomElement(DomHTMLElement domElement,
       {bool focusedElement = false}) {
@@ -472,9 +474,12 @@ class TextEditingDeltaState {
   /// Infers the correct delta values based on information from the new editing state
   /// and the last editing state.
   ///
-  /// For a deletion we calculate the length of the deleted text by comparing the new
-  /// and last editing states. We subtract this from the [deltaEnd] that we set when beforeinput
-  /// was fired to determine the [deltaStart].
+  /// For a deletion, the length and the direction of the deletion (backward or forward)
+  /// are calculated by comparing the new and last editing states.
+  /// If the deletion is backward, the length is susbtracted from the [deltaEnd]
+  /// that we set when beforeinput was fired to determine the [deltaStart].
+  /// If the deletion is forward, [deltaStart] is set to the new editing state baseOffset
+  /// and [deltaEnd] is set to [deltaStart] incremented by the length of the deletion.
   ///
   /// For a replacement at a selection we set the [deltaStart] to be the beginning of the selection
   /// from the last editing state.
@@ -495,9 +500,19 @@ class TextEditingDeltaState {
     if (isTextBeingRemoved) {
       // When text is deleted outside of the composing region or is cut using the native toolbar,
       // we calculate the length of the deleted text by comparing the new and old editing state lengths.
-      // This value is then subtracted from the end position of the delta to capture the deleted range.
+      // If the deletion is backward, the length is susbtracted from the [deltaEnd]
+      // that we set when beforeinput was fired to determine the [deltaStart].
+      // If the deletion is forward, [deltaStart] is set to the new editing state baseOffset
+      // and [deltaEnd] is set to [deltaStart] incremented by the length of the deletion.
       final int deletedLength = newTextEditingDeltaState.oldText.length - newEditingState.text!.length;
-      newTextEditingDeltaState.deltaStart = newTextEditingDeltaState.deltaEnd - deletedLength;
+      final bool backwardDeletion = newEditingState.baseOffset != lastEditingState?.baseOffset;
+      if (backwardDeletion) {
+        newTextEditingDeltaState.deltaStart = newTextEditingDeltaState.deltaEnd - deletedLength;
+      } else {
+        // Forward deletion
+        newTextEditingDeltaState.deltaStart = newEditingState.baseOffset!;
+        newTextEditingDeltaState.deltaEnd = newTextEditingDeltaState.deltaStart + deletedLength;
+      }
     } else if (isTextBeingChangedAtActiveSelection) {
       // When a selection of text is replaced by a copy/paste operation we set the starting range
       // of the delta to be the beginning of the selection of the previous editing state.
@@ -573,8 +588,8 @@ class TextEditingDeltaState {
     }
 
     // Update selection of the delta using information from the new editing state.
-    newTextEditingDeltaState.baseOffset = newEditingState.baseOffset!;
-    newTextEditingDeltaState.extentOffset = newEditingState.extentOffset!;
+    newTextEditingDeltaState.baseOffset = newEditingState.baseOffset;
+    newTextEditingDeltaState.extentOffset = newEditingState.extentOffset;
 
     return newTextEditingDeltaState;
   }
@@ -653,13 +668,13 @@ class EditingState {
       this.text,
       int? baseOffset,
       int? extentOffset,
-      this.composingBaseOffset,
-      this.composingExtentOffset
+      this.composingBaseOffset = -1,
+      this.composingExtentOffset = -1
     }) :
-    // Don't allow negative numbers. Pick the smallest selection index for base.
-    baseOffset = math.max(0, math.min(baseOffset ?? 0, extentOffset ?? 0)),
-    // Don't allow negative numbers. Pick the greatest selection index for extent.
-    extentOffset = math.max(0, math.max(baseOffset ?? 0, extentOffset ?? 0));
+        // Don't allow negative numbers.
+        baseOffset = math.max(0, baseOffset ?? 0),
+        // Don't allow negative numbers.
+        extentOffset = math.max(0, extentOffset ?? 0);
 
   /// Creates an [EditingState] instance using values from an editing state Map
   /// coming from Flutter.
@@ -694,8 +709,8 @@ class EditingState {
       text: text,
       baseOffset: selectionBase,
       extentOffset: selectionExtent,
-      composingBaseOffset: composingBase,
-      composingExtentOffset: composingExtent
+      composingBaseOffset: composingBase ?? -1,
+      composingExtentOffset: composingExtent ?? -1
     );
   }
 
@@ -709,19 +724,24 @@ class EditingState {
       final DomHTMLInputElement element = domElement! as DomHTMLInputElement;
       return EditingState(
           text: element.value,
-          baseOffset: element.selectionStart,
-          extentOffset: element.selectionEnd);
+          baseOffset: element.selectionStart?.toInt(),
+          extentOffset: element.selectionEnd?.toInt());
     } else if (domInstanceOfString(domElement, 'HTMLTextAreaElement')) {
       final DomHTMLTextAreaElement element = domElement! as
           DomHTMLTextAreaElement;
       return EditingState(
           text: element.value,
-          baseOffset: element.selectionStart,
-          extentOffset: element.selectionEnd);
+          baseOffset: element.selectionStart?.toInt(),
+          extentOffset: element.selectionEnd?.toInt());
     } else {
       throw UnsupportedError('Initialized with unsupported input type');
     }
   }
+
+  // Pick the smallest selection index for base.
+  int get minOffset => math.min(baseOffset ?? 0, extentOffset ?? 0);
+  // Pick the greatest selection index for extent.
+  int get maxOffset => math.max(baseOffset ?? 0, extentOffset ?? 0);
 
     EditingState copyWith({
      String? text,
@@ -760,10 +780,10 @@ class EditingState {
   final int? extentOffset;
 
   /// The offset at which [CompositionAwareMixin.composingText] begins, if any.
-  final int? composingBaseOffset;
+  final int composingBaseOffset;
 
   /// The offset at which [CompositionAwareMixin.composingText] terminates, if any.
-  final int? composingExtentOffset;
+  final int composingExtentOffset;
 
   /// Whether the current editing state is valid or not.
   bool get isValid => baseOffset! >= 0 && extentOffset! >= 0;
@@ -783,8 +803,8 @@ class EditingState {
     }
     return other is EditingState &&
         other.text == text &&
-        other.baseOffset == baseOffset &&
-        other.extentOffset == extentOffset &&
+        other.minOffset == minOffset &&
+        other.maxOffset == maxOffset &&
         other.composingBaseOffset == composingBaseOffset &&
         other.composingExtentOffset == composingExtentOffset;
   }
@@ -812,12 +832,12 @@ class EditingState {
     if (domInstanceOfString(domElement, 'HTMLInputElement')) {
       final DomHTMLInputElement element = domElement! as DomHTMLInputElement;
       element.value = text;
-      element.setSelectionRange(baseOffset!, extentOffset!);
+      element.setSelectionRange(minOffset, maxOffset);
     } else if (domInstanceOfString(domElement, 'HTMLTextAreaElement')) {
       final DomHTMLTextAreaElement element = domElement! as
           DomHTMLTextAreaElement;
       element.value = text;
-      element.setSelectionRange(baseOffset!, extentOffset!);
+      element.setSelectionRange(minOffset, maxOffset);
     } else {
       throw UnsupportedError('Unsupported DOM element type: <${domElement?.tagName}> (${domElement.runtimeType})');
     }
@@ -977,7 +997,7 @@ abstract class TextEditingStrategy {
 /// enabled. With semantics enabled the placement is provided by the semantics
 /// tree.
 class GloballyPositionedTextEditingStrategy extends DefaultTextEditingStrategy {
-  GloballyPositionedTextEditingStrategy(HybridTextEditing owner) : super(owner);
+  GloballyPositionedTextEditingStrategy(super.owner);
 
   @override
   void placeElement() {
@@ -1016,7 +1036,7 @@ class GloballyPositionedTextEditingStrategy extends DefaultTextEditingStrategy {
 /// enabled. With semantics enabled the placement is provided by the semantics
 /// tree.
 class SafariDesktopTextEditingStrategy extends DefaultTextEditingStrategy {
-  SafariDesktopTextEditingStrategy(HybridTextEditing owner) : super(owner);
+  SafariDesktopTextEditingStrategy(super.owner);
 
   /// Appending an element on the DOM for Safari Desktop Browser.
   ///
@@ -1084,9 +1104,9 @@ class SafariDesktopTextEditingStrategy extends DefaultTextEditingStrategy {
 /// Unless a formfactor/browser requires specific implementation for a specific
 /// strategy the methods in this class should be used.
 abstract class DefaultTextEditingStrategy with CompositionAwareMixin implements TextEditingStrategy  {
-  final HybridTextEditing owner;
-
   DefaultTextEditingStrategy(this.owner);
+
+  final HybridTextEditing owner;
 
   bool isEnabled = false;
 
@@ -1180,6 +1200,9 @@ abstract class DefaultTextEditingStrategy with CompositionAwareMixin implements 
     if (config.inputType == EngineInputType.none) {
       activeDomElement.setAttribute('inputmode', 'none');
     }
+
+    final EngineInputAction action = EngineInputAction.fromName(config.inputAction);
+    action.configureInputAction(activeDomElement);
 
     final AutofillInfo? autofill = config.autofill;
     if (autofill != null) {
@@ -1353,6 +1376,10 @@ abstract class DefaultTextEditingStrategy with CompositionAwareMixin implements 
       final DomKeyboardEvent event = e as DomKeyboardEvent;
       if (event.keyCode == _kReturnKeyCode) {
         onAction!(inputConfiguration.inputAction);
+        // Prevent the browser from inserting a new line when it's not a multiline input.
+        if (inputConfiguration.inputType is! MultilineInputType) {
+          event.preventDefault();
+        }
       }
     }
   }
@@ -1421,7 +1448,7 @@ abstract class DefaultTextEditingStrategy with CompositionAwareMixin implements 
 /// inputmodeAttribute needs to be set for mobile devices. Due to this
 /// [initializeTextEditing] is different.
 class IOSTextEditingStrategy extends GloballyPositionedTextEditingStrategy {
-  IOSTextEditingStrategy(HybridTextEditing owner) : super(owner);
+  IOSTextEditingStrategy(super.owner);
 
   /// Timer that times when to set the location of the input text.
   ///
@@ -1618,7 +1645,7 @@ class IOSTextEditingStrategy extends GloballyPositionedTextEditingStrategy {
 /// Keyboard acts differently than other devices. [addEventHandlers] handles
 /// this case as an extra.
 class AndroidTextEditingStrategy extends GloballyPositionedTextEditingStrategy {
-  AndroidTextEditingStrategy(HybridTextEditing owner) : super(owner);
+  AndroidTextEditingStrategy(super.owner);
 
   @override
   void initializeTextEditing(
@@ -1689,7 +1716,7 @@ class AndroidTextEditingStrategy extends GloballyPositionedTextEditingStrategy {
 /// Selections are different in Firefox. [addEventHandlers] strategy is
 /// impelemented diefferently in Firefox.
 class FirefoxTextEditingStrategy extends GloballyPositionedTextEditingStrategy {
-  FirefoxTextEditingStrategy(HybridTextEditing owner) : super(owner);
+  FirefoxTextEditingStrategy(super.owner);
 
   @override
   void initializeTextEditing(
@@ -1770,7 +1797,7 @@ class FirefoxTextEditingStrategy extends GloballyPositionedTextEditingStrategy {
     // inside the blur event, therefore we postpone the focus.
     // Calling focus inside a Timer for `0` milliseconds guarantee that it is
     // called after blur event propagation is completed.
-    Timer(const Duration(milliseconds: 0), () {
+    Timer(Duration.zero, () {
       activeDomElement.focus();
     });
   }

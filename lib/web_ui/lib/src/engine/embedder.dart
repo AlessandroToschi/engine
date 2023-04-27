@@ -6,9 +6,8 @@ import 'dart:async';
 
 import 'package:ui/ui.dart' as ui;
 
-import '../engine.dart' show buildMode, registerHotRestartListener;
+import '../engine.dart' show buildMode, registerHotRestartListener, renderer;
 import 'browser_detection.dart';
-import 'canvaskit/initialization.dart';
 import 'configuration.dart';
 import 'dom.dart';
 import 'host_node.dart';
@@ -199,7 +198,7 @@ class FlutterViewEmbedder {
 
     bodyElement.setAttribute(
       'flt-renderer',
-      '${useCanvasKit ? 'canvaskit' : 'html'} (${FlutterConfiguration.flutterWebAutoDetect ? 'auto-selected' : 'requested explicitly'})',
+      '${renderer.rendererTag} (${FlutterConfiguration.flutterWebAutoDetect ? 'auto-selected' : 'requested explicitly'})',
     );
     bodyElement.setAttribute('flt-build-mode', buildMode);
 
@@ -287,13 +286,7 @@ class FlutterViewEmbedder {
     _sceneHostElement = domDocument.createElement('flt-scene-host')
       ..style.pointerEvents = 'none';
 
-    /// CanvasKit uses a static scene element that never gets replaced, so it's
-    /// added eagerly during initialization here and never touched, unless the
-    /// system is reset due to hot restart or in a test.
-    if (useCanvasKit) {
-      skiaSceneHost = createDomElement('flt-scene');
-      addSceneToSceneHost(skiaSceneHost);
-    }
+    renderer.reset(this);
 
     final DomElement semanticsHostElement =
         domDocument.createElement('flt-semantics-host');
@@ -303,12 +296,12 @@ class FlutterViewEmbedder {
     _semanticsHostElement = semanticsHostElement;
     updateSemanticsScreenProperties();
 
-    final DomElement _accessibilityPlaceholder = EngineSemanticsOwner
+    final DomElement accessibilityPlaceholder = EngineSemanticsOwner
         .instance.semanticsHelper
         .prepareAccessibilityPlaceholder();
 
     glassPaneElementHostNode.appendAll(<DomNode>[
-      _accessibilityPlaceholder,
+      accessibilityPlaceholder,
       _sceneHostElement!,
 
       // The semantic host goes last because hit-test order-wise it must be
@@ -330,8 +323,8 @@ class FlutterViewEmbedder {
       _sceneHostElement!.style.opacity = '0.3';
     }
 
-    PointerBinding.initInstance(glassPaneElement);
-    KeyboardBinding.initInstance(glassPaneElement);
+    KeyboardBinding.initInstance();
+    PointerBinding.initInstance(glassPaneElement, KeyboardBinding.instance!.converter);
 
     if (domWindow.visualViewport == null && isWebKit) {
       // Older Safari versions sometimes give us bogus innerWidth/innerHeight
@@ -347,7 +340,7 @@ class FlutterViewEmbedder {
       // Firefox returns correct values for innerHeight, innerWidth.
       // Firefox also triggers domWindow.onResize therefore this timer does
       // not need to be set up for Firefox.
-      final int initialInnerWidth = domWindow.innerWidth!;
+      final int initialInnerWidth = domWindow.innerWidth!.toInt();
       // Counts how many times screen size was checked. It is checked up to 5
       // times.
       int checkCount = 0;
@@ -419,9 +412,7 @@ class FlutterViewEmbedder {
   /// Called immediately after browser window language change.
   void _languageDidChange(DomEvent event) {
     EnginePlatformDispatcher.instance.updateLocales();
-    if (ui.window.onLocaleChanged != null) {
-      ui.window.onLocaleChanged!();
-    }
+    ui.window.onLocaleChanged?.call();
   }
 
   static const String orientationLockTypeAny = 'any';
@@ -446,12 +437,12 @@ class FlutterViewEmbedder {
   ///
   /// See w3c screen api: https://www.w3.org/TR/screen-orientation/
   Future<bool> setPreferredOrientation(List<dynamic> orientations) {
-    final DomScreen screen = domWindow.screen!;
-    if (!unsafeIsNull(screen)) {
+    final DomScreen? screen = domWindow.screen;
+    if (screen != null) {
       final DomScreenOrientation? screenOrientation = screen.orientation;
-      if (!unsafeIsNull(screenOrientation)) {
+      if (screenOrientation != null) {
         if (orientations.isEmpty) {
-          screenOrientation!.unlock();
+          screenOrientation.unlock();
           return Future<bool>.value(true);
         } else {
           final String? lockType =
@@ -459,7 +450,7 @@ class FlutterViewEmbedder {
           if (lockType != null) {
             final Completer<bool> completer = Completer<bool>();
             try {
-              screenOrientation!.lock(lockType).then((dynamic _) {
+              screenOrientation.lock(lockType).then((dynamic _) {
                 completer.complete(true);
               }).catchError((dynamic error) {
                 // On Chrome desktop an error with 'not supported on this device
@@ -479,13 +470,15 @@ class FlutterViewEmbedder {
   }
 
   // Converts device orientation to w3c OrientationLockType enum.
+  //
+  // See also: https://developer.mozilla.org/en-US/docs/Web/API/ScreenOrientation/lock
   static String? _deviceOrientationToLockType(String? deviceOrientation) {
     switch (deviceOrientation) {
       case 'DeviceOrientation.portraitUp':
         return orientationLockTypePortraitPrimary;
-      case 'DeviceOrientation.landscapeLeft':
-        return orientationLockTypePortraitSecondary;
       case 'DeviceOrientation.portraitDown':
+        return orientationLockTypePortraitSecondary;
+      case 'DeviceOrientation.landscapeLeft':
         return orientationLockTypeLandscapePrimary;
       case 'DeviceOrientation.landscapeRight':
         return orientationLockTypeLandscapeSecondary;
@@ -558,7 +551,7 @@ void applyGlobalCssRulesToSheet(
     // - See: https://github.com/flutter/flutter/issues/44803
     sheet.insertRule(
       'flt-paragraph, flt-span {line-height: 100%;}',
-      sheet.cssRules.length,
+      sheet.cssRules.length.toInt(),
     );
   }
 
@@ -578,7 +571,7 @@ void applyGlobalCssRulesToSheet(
       left: 0;
     }
     ''',
-    sheet.cssRules.length,
+    sheet.cssRules.length.toInt(),
   );
 
   if (isWebKit) {
@@ -586,7 +579,7 @@ void applyGlobalCssRulesToSheet(
         'flt-semantics input[type=range]::-webkit-slider-thumb {'
         '  -webkit-appearance: none;'
         '}',
-        sheet.cssRules.length);
+        sheet.cssRules.length.toInt());
   }
 
   if (isFirefox) {
@@ -594,12 +587,12 @@ void applyGlobalCssRulesToSheet(
         'input::-moz-selection {'
         '  background-color: transparent;'
         '}',
-        sheet.cssRules.length);
+        sheet.cssRules.length.toInt());
     sheet.insertRule(
         'textarea::-moz-selection {'
         '  background-color: transparent;'
         '}',
-        sheet.cssRules.length);
+        sheet.cssRules.length.toInt());
   } else {
     // On iOS, the invisible semantic text field has a visible cursor and
     // selection highlight. The following 2 CSS rules force everything to be
@@ -608,12 +601,12 @@ void applyGlobalCssRulesToSheet(
         'input::selection {'
         '  background-color: transparent;'
         '}',
-        sheet.cssRules.length);
+        sheet.cssRules.length.toInt());
     sheet.insertRule(
         'textarea::selection {'
         '  background-color: transparent;'
         '}',
-        sheet.cssRules.length);
+        sheet.cssRules.length.toInt());
   }
   sheet.insertRule('''
     flt-semantics input,
@@ -621,7 +614,7 @@ void applyGlobalCssRulesToSheet(
     flt-semantics [contentEditable="true"] {
     caret-color: transparent;
   }
-  ''', sheet.cssRules.length);
+  ''', sheet.cssRules.length.toInt());
 
   // By default on iOS, Safari would highlight the element that's being tapped
   // on using gray background. This CSS rule disables that.
@@ -630,7 +623,7 @@ void applyGlobalCssRulesToSheet(
       $glassPaneTagName * {
       -webkit-tap-highlight-color: transparent;
     }
-    ''', sheet.cssRules.length);
+    ''', sheet.cssRules.length.toInt());
   }
 
   // Hide placeholder text
@@ -640,7 +633,7 @@ void applyGlobalCssRulesToSheet(
       opacity: 0;
     }
     ''',
-    sheet.cssRules.length,
+    sheet.cssRules.length.toInt(),
   );
 
   // This css prevents an autofill overlay brought by the browser during
@@ -654,7 +647,7 @@ void applyGlobalCssRulesToSheet(
       .transparentTextEditing:-webkit-autofill:active {
         -webkit-transition-delay: 99999s;
       }
-    ''', sheet.cssRules.length);
+    ''', sheet.cssRules.length.toInt());
   }
 }
 

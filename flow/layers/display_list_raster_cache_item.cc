@@ -108,23 +108,25 @@ void DisplayListRasterCacheItem::PrerollFinalize(PrerollContext* context,
   // if the rect is intersect we will get the entry access_count to confirm if
   // it great than the threshold. Otherwise we only increase the entry
   // access_count.
-  if (context->cull_rect.intersect(bounds)) {
-    if (raster_cache->MarkSeen(key_id_, transformation_matrix_) <
-        raster_cache->access_threshold()) {
-      cache_state_ = CacheState::kNone;
-      return;
-    }
-    context->subtree_can_inherit_opacity = true;
-    cache_state_ = CacheState::kCurrent;
+  bool visible = !context->state_stack.content_culled(bounds);
+  RasterCache::CacheInfo cache_info =
+      raster_cache->MarkSeen(key_id_, matrix, visible);
+  if (!visible ||
+      cache_info.accesses_since_visible <= raster_cache->access_threshold()) {
+    cache_state_ = kNone;
   } else {
-    raster_cache->Touch(key_id_, matrix);
+    if (cache_info.has_image) {
+      context->renderable_state_flags |=
+          LayerStateStack::kCallerCanApplyOpacity;
+    }
+    cache_state_ = kCurrent;
   }
   return;
 }
 
 bool DisplayListRasterCacheItem::Draw(const PaintContext& context,
                                       const SkPaint* paint) const {
-  return Draw(context, context.leaf_nodes_canvas, paint);
+  return Draw(context, context.canvas, paint);
 }
 
 bool DisplayListRasterCacheItem::Draw(const PaintContext& context,
@@ -136,9 +138,6 @@ bool DisplayListRasterCacheItem::Draw(const PaintContext& context,
   if (cache_state_ == CacheState::kCurrent) {
     return context.raster_cache->Draw(key_id_, *canvas, paint);
   }
-  // This display_list doesn't cache itself, this only increase the entry
-  // access_count;
-  context.raster_cache->Touch(key_id_, canvas->getTotalMatrix());
   return false;
 }
 
@@ -165,7 +164,6 @@ bool DisplayListRasterCacheItem::TryToPrepareRasterCache(
       .matrix             = transformation_matrix_,
       .logical_rect       = bounds,
       .flow_type          = flow_type,
-      .checkerboard       = context.checkerboard_offscreen_layers,
       // clang-format on
   };
   return context.raster_cache->UpdateCacheEntry(

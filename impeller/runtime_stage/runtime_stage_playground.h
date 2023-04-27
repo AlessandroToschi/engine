@@ -5,19 +5,16 @@
 #pragma once
 
 #include "flutter/fml/macros.h"
-#include "impeller/playground/playground.h"
+#include "impeller/playground/playground_test.h"
 #include "impeller/runtime_stage/runtime_stage.h"
 
 namespace impeller {
 
-class RuntimeStagePlayground : public Playground {
+class RuntimeStagePlayground : public PlaygroundTest {
  public:
   RuntimeStagePlayground();
 
   ~RuntimeStagePlayground();
-
-  std::unique_ptr<RuntimeStage> CreateStageFromFixture(
-      const std::string& fixture_name) const;
 
   bool RegisterStage(const RuntimeStage& stage);
 

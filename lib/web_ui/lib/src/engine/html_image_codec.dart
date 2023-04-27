@@ -25,10 +25,10 @@ typedef WebOnlyImageCodecChunkCallback = void Function(
     int cumulativeBytesLoaded, int expectedTotalBytes);
 
 class HtmlCodec implements ui.Codec {
+  HtmlCodec(this.src, {this.chunkCallback});
+
   final String src;
   final WebOnlyImageCodecChunkCallback? chunkCallback;
-
-  HtmlCodec(this.src, {this.chunkCallback});
 
   @override
   int get frameCount => 1;
@@ -53,12 +53,10 @@ class HtmlCodec implements ui.Codec {
       // ignore: unawaited_futures
       imgElement.decode().then((dynamic _) {
         chunkCallback?.call(100, 100);
-        int naturalWidth = imgElement.naturalWidth;
-        int naturalHeight = imgElement.naturalHeight;
+        int naturalWidth = imgElement.naturalWidth.toInt();
+        int naturalHeight = imgElement.naturalHeight.toInt();
         // Workaround for https://bugzilla.mozilla.org/show_bug.cgi?id=700533.
-        if (naturalWidth == 0 && naturalHeight == 0 && (
-            browserEngine == BrowserEngine.firefox ||
-                browserEngine == BrowserEngine.ie11)) {
+        if (naturalWidth == 0 && naturalHeight == 0 && browserEngine == BrowserEngine.firefox) {
           const int kDefaultImageSizeFallback = 300;
           naturalWidth = kDefaultImageSizeFallback;
           naturalHeight = kDefaultImageSizeFallback;
@@ -101,12 +99,12 @@ class HtmlCodec implements ui.Codec {
       if (chunkCallback != null) {
         chunkCallback!(100, 100);
       }
-      imgElement.removeEventListener('load', loadListener!);
+      imgElement.removeEventListener('load', loadListener);
       imgElement.removeEventListener('error', errorListener);
       final HtmlImage image = HtmlImage(
         imgElement,
-        imgElement.naturalWidth,
-        imgElement.naturalHeight,
+        imgElement.naturalWidth.toInt(),
+        imgElement.naturalHeight.toInt(),
       );
       completer.complete(SingleFrameInfo(image));
     });
@@ -119,9 +117,9 @@ class HtmlCodec implements ui.Codec {
 }
 
 class HtmlBlobCodec extends HtmlCodec {
-  final DomBlob blob;
-
   HtmlBlobCodec(this.blob) : super(domWindow.URL.createObjectURL(blob));
+
+  final DomBlob blob;
 
   @override
   void dispose() {
@@ -133,20 +131,24 @@ class SingleFrameInfo implements ui.FrameInfo {
   SingleFrameInfo(this.image);
 
   @override
-  Duration get duration => const Duration(milliseconds: 0);
+  Duration get duration => Duration.zero;
 
   @override
   final ui.Image image;
 }
 
 class HtmlImage implements ui.Image {
+  HtmlImage(this.imgElement, this.width, this.height) {
+    ui.Image.onCreate?.call(this);
+  }
+
   final DomHTMLImageElement imgElement;
-  bool _requiresClone = false;
-  HtmlImage(this.imgElement, this.width, this.height);
+  bool _didClone = false;
 
   bool _disposed = false;
   @override
   void dispose() {
+    ui.Image.onDispose?.call(this);
     // Do nothing. The codec that owns this image should take care of
     // releasing the object url.
     if (assertionsEnabled) {
@@ -186,32 +188,28 @@ class HtmlImage implements ui.Image {
       case ui.ImageByteFormat.rawRgba:
       case ui.ImageByteFormat.rawStraightRgba:
         final DomCanvasElement canvas = createDomCanvasElement()
-          ..width = width
-          ..height = height;
+          ..width = width.toDouble()
+          ..height = height.toDouble();
         final DomCanvasRenderingContext2D ctx = canvas.context2D;
         ctx.drawImage(imgElement, 0, 0);
         final DomImageData imageData = ctx.getImageData(0, 0, width, height);
         return Future<ByteData?>.value(imageData.data.buffer.asByteData());
       default:
-        if (imgElement.src?.startsWith('data:') == true) {
+        if (imgElement.src?.startsWith('data:') ?? false) {
           final UriData data = UriData.fromUri(Uri.parse(imgElement.src!));
           return Future<ByteData?>.value(data.contentAsBytes().buffer.asByteData());
         } else {
-          return Future<ByteData?>.value(null);
+          return Future<ByteData?>.value();
         }
     }
   }
 
-  // Returns absolutely positioned actual image element on first call and
-  // clones on subsequent calls.
   DomHTMLImageElement cloneImageElement() {
-    if (_requiresClone) {
-      return imgElement.cloneNode(true) as DomHTMLImageElement;
-    } else {
-      _requiresClone = true;
+    if (!_didClone) {
+      _didClone = true;
       imgElement.style.position = 'absolute';
-      return imgElement;
     }
+    return imgElement.cloneNode(true) as DomHTMLImageElement;
   }
 
   @override

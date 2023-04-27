@@ -12,7 +12,7 @@ import 'package:js/js.dart';
 import 'package:meta/meta.dart';
 import 'package:ui/ui.dart' as ui;
 
-import '../engine.dart' show registerHotRestartListener;
+import '../engine.dart' show registerHotRestartListener, renderer;
 import 'browser_detection.dart';
 import 'dom.dart';
 import 'navigation/history.dart';
@@ -54,6 +54,7 @@ class EngineFlutterWindow extends ui.SingletonFlutterWindow {
     }
     registerHotRestartListener(() {
       _browserHistory?.dispose();
+      renderer.clearFragmentProgramCache();
     });
   }
 
@@ -151,7 +152,7 @@ class EngineFlutterWindow extends ui.SingletonFlutterWindow {
     _customUrlStrategy = null;
   }
 
-  Future<void> _endOfTheLine = Future<void>.value(null);
+  Future<void> _endOfTheLine = Future<void>.value();
 
   Future<bool> _waitInTheLine(_HandleMessageCallBack callback) async {
     final Future<void> currentPosition = _endOfTheLine;
@@ -246,14 +247,14 @@ class EngineFlutterWindow extends ui.SingletonFlutterWindow {
           /// text editing to make sure inset is correctly reported to
           /// framework.
           final double docWidth =
-              domDocument.documentElement!.clientWidth.toDouble();
+              domDocument.documentElement!.clientWidth;
           final double docHeight =
-              domDocument.documentElement!.clientHeight.toDouble();
+              domDocument.documentElement!.clientHeight;
           windowInnerWidth = docWidth * devicePixelRatio;
           windowInnerHeight = docHeight * devicePixelRatio;
         } else {
-          windowInnerWidth = viewport.width!.toDouble() * devicePixelRatio;
-          windowInnerHeight = viewport.height!.toDouble() * devicePixelRatio;
+          windowInnerWidth = viewport.width! * devicePixelRatio;
+          windowInnerHeight = viewport.height! * devicePixelRatio;
         }
       } else {
         windowInnerWidth = domWindow.innerWidth! * devicePixelRatio;
@@ -279,7 +280,7 @@ class EngineFlutterWindow extends ui.SingletonFlutterWindow {
         windowInnerHeight =
             domDocument.documentElement!.clientHeight * devicePixelRatio;
       } else {
-        windowInnerHeight = viewport.height!.toDouble() * devicePixelRatio;
+        windowInnerHeight = viewport.height! * devicePixelRatio;
       }
     } else {
       windowInnerHeight = domWindow.innerHeight! * devicePixelRatio;
@@ -308,8 +309,8 @@ class EngineFlutterWindow extends ui.SingletonFlutterWindow {
     double width = 0;
     if (domWindow.visualViewport != null) {
       height =
-          domWindow.visualViewport!.height!.toDouble() * devicePixelRatio;
-      width = domWindow.visualViewport!.width!.toDouble() * devicePixelRatio;
+          domWindow.visualViewport!.height! * devicePixelRatio;
+      width = domWindow.visualViewport!.width! * devicePixelRatio;
     } else {
       height = domWindow.innerHeight! * devicePixelRatio;
       width = domWindow.innerWidth! * devicePixelRatio;
@@ -363,8 +364,7 @@ UrlStrategy? _createDefaultUrlStrategy() {
 /// The Web implementation of [ui.SingletonFlutterWindow].
 class EngineSingletonFlutterWindow extends EngineFlutterWindow {
   EngineSingletonFlutterWindow(
-      Object windowId, ui.PlatformDispatcher platformDispatcher)
-      : super(windowId, platformDispatcher);
+      super.windowId, super.platformDispatcher);
 
   @override
   double get devicePixelRatio =>

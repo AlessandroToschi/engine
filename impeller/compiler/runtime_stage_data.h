@@ -21,6 +21,8 @@ struct UniformDescription {
   spirv_cross::SPIRType::BaseType type = spirv_cross::SPIRType::BaseType::Float;
   size_t rows = 0u;
   size_t columns = 0u;
+  size_t bit_width = 0u;
+  std::optional<size_t> array_elements = std::nullopt;
 };
 
 class RuntimeStageData {
@@ -35,7 +37,11 @@ class RuntimeStageData {
 
   void SetShaderData(std::shared_ptr<fml::Mapping> shader);
 
+  void SetSkSLData(std::shared_ptr<fml::Mapping> sksl);
+
   std::shared_ptr<fml::Mapping> CreateMapping() const;
+
+  std::shared_ptr<fml::Mapping> CreateJsonMapping() const;
 
  private:
   const std::string entrypoint_;
@@ -43,6 +49,7 @@ class RuntimeStageData {
   const TargetPlatform target_platform_;
   std::vector<UniformDescription> uniforms_;
   std::shared_ptr<fml::Mapping> shader_;
+  std::shared_ptr<fml::Mapping> sksl_;
 
   FML_DISALLOW_COPY_AND_ASSIGN(RuntimeStageData);
 };

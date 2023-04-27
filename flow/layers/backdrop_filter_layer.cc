@@ -39,42 +39,27 @@ void BackdropFilterLayer::Diff(DiffContext* context, const Layer* old_layer) {
   context->SetLayerPaintRegion(this, context->CurrentSubtreeRegion());
 }
 
-void BackdropFilterLayer::Preroll(PrerollContext* context,
-                                  const SkMatrix& matrix) {
+void BackdropFilterLayer::Preroll(PrerollContext* context) {
   Layer::AutoPrerollSaveLayerState save =
       Layer::AutoPrerollSaveLayerState::Create(context, true, bool(filter_));
+  if (context->view_embedder != nullptr) {
+    context->view_embedder->PushFilterToVisitedPlatformViews(
+        filter_, context->state_stack.local_cull_rect());
+  }
   SkRect child_paint_bounds = SkRect::MakeEmpty();
-  PrerollChildren(context, matrix, &child_paint_bounds);
-  child_paint_bounds.join(context->cull_rect);
+  PrerollChildren(context, &child_paint_bounds);
+  child_paint_bounds.join(context->state_stack.local_cull_rect());
   set_paint_bounds(child_paint_bounds);
+  context->renderable_state_flags = kSaveLayerRenderFlags;
 }
 
 void BackdropFilterLayer::Paint(PaintContext& context) const {
-  TRACE_EVENT0("flutter", "BackdropFilterLayer::Paint");
   FML_DCHECK(needs_painting(context));
 
-  if (context.leaf_nodes_builder) {
-    DlPaint paint;
-    paint.setBlendMode(blend_mode_);
-    context.leaf_nodes_builder->saveLayer(&paint_bounds(), &paint,
-                                          filter_.get());
+  auto mutator = context.state_stack.save();
+  mutator.applyBackdropFilter(paint_bounds(), filter_, blend_mode_);
 
-    PaintChildren(context);
-
-    context.leaf_nodes_builder->restore();
-  } else {
-    SkPaint paint;
-    paint.setBlendMode(ToSk(blend_mode_));
-    auto sk_filter = filter_ ? filter_->skia_object() : nullptr;
-    Layer::AutoSaveLayer save = Layer::AutoSaveLayer::Create(
-        context,
-        SkCanvas::SaveLayerRec{&paint_bounds(), &paint, sk_filter.get(), 0},
-        // BackdropFilter should only happen on the leaf nodes canvas.
-        // See https:://flutter.dev/go/backdrop-filter-with-overlay-canvas
-        AutoSaveLayer::SaveMode::kLeafNodesCanvas);
-
-    PaintChildren(context);
-  }
+  PaintChildren(context);
 }
 
 }  // namespace flutter

@@ -9,6 +9,18 @@ import '../../engine.dart';
 
 /// Caches surfaces used to overlay platform views.
 class SurfaceFactory {
+  SurfaceFactory(int maximumSurfaces)
+      : maximumSurfaces = math.max(maximumSurfaces, 1) {
+    if (assertionsEnabled) {
+      if (maximumSurfaces < 1) {
+        printWarning('Attempted to create a $SurfaceFactory with '
+            '$maximumSurfaces maximum surfaces. At least 1 surface is required '
+            'for rendering.');
+      }
+      registerHotRestartListener(debugClear);
+    }
+  }
+
   /// The lazy-initialized singleton surface factory.
   ///
   /// [debugClear] causes this singleton to be reinitialized.
@@ -29,22 +41,14 @@ class SurfaceFactory {
 
   static SurfaceFactory? _instance;
 
-  SurfaceFactory(int maximumSurfaces)
-      : maximumSurfaces = math.max(maximumSurfaces, 1) {
-    if (assertionsEnabled) {
-      if (maximumSurfaces < 1) {
-        printWarning('Attempted to create a $SurfaceFactory with '
-            '$maximumSurfaces maximum surfaces. At least 1 surface is required '
-            'for rendering.');
-      }
-      registerHotRestartListener(debugClear);
-    }
-  }
-
   /// The base surface to paint on. This is the default surface which will be
   /// painted to. If there are no platform views, then this surface will receive
   /// all painting commands.
   final Surface baseSurface = Surface();
+
+  /// A surface used specifically for `Picture.toImage` calls, which can be
+  /// reused in order to avoid creating too many WebGL contexts.
+  late final Surface pictureToImageSurface = Surface();
 
   /// The maximum number of surfaces which can be live at once.
   final int maximumSurfaces;
@@ -81,7 +85,7 @@ class SurfaceFactory {
 
   /// Gets an overlay surface from the cache or creates a new one if it wouldn't
   /// exceed the maximum. If there are no available surfaces, returns `null`.
-  Surface? getOverlay() {
+  Surface? getSurface() {
     if (_cache.isNotEmpty) {
       final Surface surface = _cache.removeLast();
       _liveSurfaces.add(surface);

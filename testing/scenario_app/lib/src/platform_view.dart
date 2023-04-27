@@ -22,10 +22,17 @@ List<int> _to64(num value) {
   final Uint8List temp = Uint8List(15);
   if (value is double) {
     temp.buffer.asByteData().setFloat64(7, value, Endian.little);
-  } else if (value is int) {
+  } else if (value is int) {  // ignore: avoid_double_and_int_checks
     temp.buffer.asByteData().setInt64(7, value, Endian.little);
   }
   return temp;
+}
+
+List<int> _encodeString(String value) {
+  return <int>[
+    value.length, // This won't work if we use multi-byte characters.
+    ...utf8.encode(value),
+  ];
 }
 
 /// A simple platform view.
@@ -117,7 +124,7 @@ class PlatformViewNoOverlayIntersectionScenario extends Scenario
 
 /// A platform view that is larger than the display size.
 /// This is only applicable on Android while using virtual displays.
-/// Related issue: https://github.com/flutter/flutter/issues/2897.
+/// Related issue: https://github.com/flutter/flutter/issues/28978.
 class PlatformViewLargerThanDisplaySize extends Scenario
     with _BasePlatformViewScenarioMixin {
   /// Creates the PlatformView scenario.
@@ -177,7 +184,7 @@ class PlatformViewPartialIntersectionScenario extends Scenario
 
     finishBuilder(
       builder,
-      overlayOffset: const Offset(150, 250),
+      overlayOffset: const Offset(150, 240),
     );
   }
 }
@@ -496,7 +503,7 @@ class MultiPlatformViewBackgroundForegroundScenario extends Scenario
       Paint()..color = const Color(0xFFFF0000),
     );
     final Picture picture = recorder.endRecording();
-    builder.addPicture(const Offset(0, 0), picture);
+    builder.addPicture(Offset.zero, picture);
 
     final Scene scene = builder.build();
     window.render(scene);
@@ -611,9 +618,44 @@ class PlatformViewClipRRectScenario extends PlatformViewScenario {
   }
 }
 
+
+/// Platform view with clip rrect.
+/// The bounding rect of the rrect is the same as PlatformView and only the corner radii clips the PlatformView.
+class PlatformViewLargeClipRRectScenario extends PlatformViewScenario {
+  /// Constructs a platform view with large clip rrect scenario.
+  PlatformViewLargeClipRRectScenario(
+    PlatformDispatcher dispatcher, {
+    int id = 0,
+  }) : super(dispatcher, id: id);
+
+  @override
+  void onBeginFrame(Duration duration) {
+    final SceneBuilder builder = SceneBuilder();
+    builder.pushClipRRect(
+      RRect.fromLTRBAndCorners(
+        0,
+        0,
+        500,
+        500,
+        topLeft: const Radius.circular(15),
+        topRight: const Radius.circular(50),
+        bottomLeft: const Radius.circular(50),
+      ),
+    );
+
+    addPlatformView(
+      id,
+      dispatcher: dispatcher,
+      sceneBuilder: builder,
+    );
+
+    finishBuilder(builder);
+  }
+}
+
 /// Platform view with clip path.
 class PlatformViewClipPathScenario extends PlatformViewScenario {
-  /// Constructs a platform view with clip rrect scenario.
+  /// Constructs a platform view with clip path scenario.
   PlatformViewClipPathScenario(
     PlatformDispatcher dispatcher, {
     int id = 0,
@@ -638,6 +680,183 @@ class PlatformViewClipPathScenario extends PlatformViewScenario {
   }
 }
 
+/// Platform view with clip rect after transformed.
+class PlatformViewClipRectWithTransformScenario extends PlatformViewScenario {
+  /// Constructs a platform view with clip rect with transform scenario.
+  PlatformViewClipRectWithTransformScenario(
+    PlatformDispatcher dispatcher, {
+    int id = 0,
+  }) : super(dispatcher, id: id);
+
+  @override
+  void onBeginFrame(Duration duration) {
+    final Matrix4 matrix4 = Matrix4.identity()
+      ..rotateZ(1)
+      ..scale(0.5, 0.5, 1.0)
+      ..translate(1000.0, 100.0);
+
+    final SceneBuilder builder = SceneBuilder()..pushTransform(matrix4.storage);
+    builder.pushClipRect(const Rect.fromLTRB(100, 100, 400, 400));
+
+    addPlatformView(
+      id,
+      dispatcher: dispatcher,
+      sceneBuilder: builder,
+    );
+
+    // Add a translucent rect that has the same size of PlatformView.
+    final PictureRecorder recorder = PictureRecorder();
+    final Canvas canvas = Canvas(recorder);
+    canvas.drawRect(
+      const Rect.fromLTWH(0, 0, 500, 500),
+      Paint()..color = const Color(0x22FF0000),
+    );
+    final Picture picture = recorder.endRecording();
+    builder.addPicture(Offset.zero, picture);
+
+    finishBuilder(builder);
+  }
+}
+
+/// Platform view with clip rrect after transformed.
+class PlatformViewClipRRectWithTransformScenario extends PlatformViewScenario {
+  /// Constructs a platform view with clip rrect with transform scenario.
+  PlatformViewClipRRectWithTransformScenario(
+    PlatformDispatcher dispatcher, {
+    int id = 0,
+  }) : super(dispatcher, id: id);
+
+  @override
+  void onBeginFrame(Duration duration) {
+    final Matrix4 matrix4 = Matrix4.identity()
+      ..rotateZ(1)
+      ..scale(0.5, 0.5, 1.0)
+      ..translate(1000.0, 100.0);
+
+    final SceneBuilder builder = SceneBuilder()..pushTransform(matrix4.storage);
+    builder.pushClipRRect(
+      RRect.fromLTRBAndCorners(
+        100,
+        100,
+        400,
+        400,
+        topLeft: const Radius.circular(15),
+        topRight: const Radius.circular(50),
+        bottomLeft: const Radius.circular(50),
+      ),
+    );
+    addPlatformView(
+      id,
+      dispatcher: dispatcher,
+      sceneBuilder: builder,
+    );
+
+    // Add a translucent rect that has the same size of PlatformView.
+    final PictureRecorder recorder = PictureRecorder();
+    final Canvas canvas = Canvas(recorder);
+    canvas.drawRect(
+      const Rect.fromLTWH(0, 0, 500, 500),
+      Paint()..color = const Color(0x22FF0000),
+    );
+    final Picture picture = recorder.endRecording();
+    builder.addPicture(Offset.zero, picture);
+
+    finishBuilder(builder);
+  }
+}
+
+/// Platform view with clip rrect after transformed.
+/// The bounding rect of the rrect is the same as PlatformView and only the corner radii clips the PlatformView.
+class PlatformViewLargeClipRRectWithTransformScenario extends PlatformViewScenario {
+  /// Constructs a platform view with large clip rrect with transform scenario.
+  PlatformViewLargeClipRRectWithTransformScenario(
+    PlatformDispatcher dispatcher, {
+    int id = 0,
+  }) : super(dispatcher, id: id);
+
+  @override
+  void onBeginFrame(Duration duration) {
+    final Matrix4 matrix4 = Matrix4.identity()
+      ..rotateZ(1)
+      ..scale(0.5, 0.5, 1.0)
+      ..translate(1000.0, 100.0);
+
+    final SceneBuilder builder = SceneBuilder()..pushTransform(matrix4.storage);
+    builder.pushClipRRect(
+      RRect.fromLTRBAndCorners(
+        0,
+        0,
+        500,
+        500,
+        topLeft: const Radius.circular(15),
+        topRight: const Radius.circular(50),
+        bottomLeft: const Radius.circular(50),
+      ),
+    );
+    addPlatformView(
+      id,
+      dispatcher: dispatcher,
+      sceneBuilder: builder,
+    );
+
+    // Add a translucent rect that has the same size of PlatformView.
+    final PictureRecorder recorder = PictureRecorder();
+    final Canvas canvas = Canvas(recorder);
+    canvas.drawRect(
+      const Rect.fromLTWH(0, 0, 500, 500),
+      Paint()..color = const Color(0x22FF0000),
+    );
+    final Picture picture = recorder.endRecording();
+    builder.addPicture(Offset.zero, picture);
+
+    finishBuilder(builder);
+  }
+}
+
+/// Platform view with clip path after transformed.
+class PlatformViewClipPathWithTransformScenario extends PlatformViewScenario {
+  /// Constructs a platform view with clip path with transform scenario.
+  PlatformViewClipPathWithTransformScenario(
+    PlatformDispatcher dispatcher, {
+    int id = 0,
+  }) : super(dispatcher, id: id);
+
+  @override
+  void onBeginFrame(Duration duration) {
+    final Matrix4 matrix4 = Matrix4.identity()
+      ..rotateZ(1)
+      ..scale(0.5, 0.5, 1.0)
+      ..translate(1000.0, 100.0);
+
+    final SceneBuilder builder = SceneBuilder()..pushTransform(matrix4.storage);
+    final Path path = Path()
+      ..moveTo(100, 100)
+      ..quadraticBezierTo(50, 250, 100, 400)
+      ..lineTo(350, 400)
+      ..cubicTo(400, 300, 300, 200, 350, 100)
+      ..close();
+
+    builder.pushClipPath(path);
+    addPlatformView(
+      id,
+      dispatcher: dispatcher,
+      sceneBuilder: builder,
+    );
+
+    // Add a translucent rect that has the same size of PlatformView.
+    final PictureRecorder recorder = PictureRecorder();
+    final Canvas canvas = Canvas(recorder);
+    canvas.drawRect(
+      const Rect.fromLTWH(0, 0, 500, 500),
+      Paint()..color = const Color(0x22FF0000),
+    );
+    final Picture picture = recorder.endRecording();
+    builder.addPicture(Offset.zero, picture);
+
+    finishBuilder(builder);
+  }
+}
+
 /// Platform view with transform.
 class PlatformViewTransformScenario extends PlatformViewScenario {
   /// Constructs a platform view with transform scenario.
@@ -651,7 +870,7 @@ class PlatformViewTransformScenario extends PlatformViewScenario {
     final Matrix4 matrix4 = Matrix4.identity()
       ..rotateZ(1)
       ..scale(0.5, 0.5, 1.0)
-      ..translate(1000.0, 100.0, 0.0);
+      ..translate(1000.0, 100.0);
 
     final SceneBuilder builder = SceneBuilder()..pushTransform(matrix4.storage);
     addPlatformView(
@@ -701,8 +920,13 @@ class PlatformViewForTouchIOSScenario extends Scenario
 
   late void Function() _nextFrame;
 
+  /// Whether gestures should be accepted or rejected.
   final bool accept;
+
+  /// The platform view identifier.
   final int id;
+
+  /// Whether touches should be rejected until the gesture ends.
   final bool rejectUntilTouchesEnded;
 
   @override
@@ -729,19 +953,17 @@ class PlatformViewForTouchIOSScenario extends Scenario
       if (accept) {
         method = 'acceptGesture';
       }
-      const int _valueString = 7;
-      const int _valueInt32 = 3;
-      const int _valueMap = 13;
+      const int valueString = 7;
+      const int valueInt32 = 3;
+      const int valueMap = 13;
       final Uint8List message = Uint8List.fromList(<int>[
-        _valueString,
-        method.length,
-        ...utf8.encode(method),
-        _valueMap,
+        valueString,
+        ..._encodeString(method),
+        valueMap,
         1,
-        _valueString,
-        'id'.length,
-        ...utf8.encode('id'),
-        _valueInt32,
+        valueString,
+        ..._encodeString('id'),
+        valueInt32,
         ..._to32(id),
       ]);
       window.sendPlatformMessage(
@@ -848,7 +1070,7 @@ class PlatformViewWithOtherBackDropFilter extends PlatformViewScenario {
       Paint()..color = const Color(0xFF00FF00),
     );
     final Picture picture = recorder.endRecording();
-    builder.addPicture(const Offset(0, 0), picture);
+    builder.addPicture(Offset.zero, picture);
 
     final ImageFilter filter = ImageFilter.blur(sigmaX: 8, sigmaY: 8);
     builder.pushBackdropFilter(filter);
@@ -930,7 +1152,7 @@ class TwoPlatformViewsWithOtherBackDropFilter extends Scenario
       Paint()..color = const Color(0xFF00FF00),
     );
     final Picture picture1 = recorder.endRecording();
-    builder.addPicture(const Offset(0, 0), picture1);
+    builder.addPicture(Offset.zero, picture1);
 
     builder.pushOffset(0, 200);
 
@@ -1086,7 +1308,7 @@ void addPlatformView(
   String viewType = 'scenarios/textPlatformView',
 }) {
   if (scenarioParams['view_type'] is String) {
-    viewType = scenarioParams['view_type'];
+    viewType = scenarioParams['view_type'] as String;
   }
 
   final String platformViewKey = '$viewType-$id';
@@ -1102,73 +1324,71 @@ void addPlatformView(
     return;
   }
 
-  bool usesAndroidHybridComposition = false;
-  if (scenarioParams['use_android_view'] is bool) {
-    usesAndroidHybridComposition = scenarioParams['use_android_view'];
-  }
+  final bool usesAndroidHybridComposition = scenarioParams['use_android_view'] as bool? ?? false;
+  final bool expectAndroidHybridCompositionFallback =
+      scenarioParams['expect_android_view_fallback'] as bool? ?? false;
 
-  const int _valueTrue = 1;
-  const int _valueInt32 = 3;
-  const int _valueFloat64 = 6;
-  const int _valueString = 7;
-  const int _valueUint8List = 8;
-  const int _valueMap = 13;
+  const int valueTrue = 1;
+  const int valueFalse = 2;
+  const int valueInt32 = 3;
+  const int valueFloat64 = 6;
+  const int valueString = 7;
+  const int valueUint8List = 8;
+  const int valueMap = 13;
 
   final Uint8List message = Uint8List.fromList(<int>[
-    _valueString,
-    'create'.length, // this won't work if we use multi-byte characters.
-    ...utf8.encode('create'),
-    _valueMap,
+    valueString,
+    ..._encodeString('create'),
+    valueMap,
     if (Platform.isIOS) 3, // 3 entries in map for iOS.
     if (Platform.isAndroid && !usesAndroidHybridComposition)
-      6, // 6 entries in map for texture on Android.
+      7, // 7 entries in map for texture on Android.
     if (Platform.isAndroid && usesAndroidHybridComposition)
       5, // 5 entries in map for hybrid composition on Android.
-    _valueString,
-    'id'.length,
-    ...utf8.encode('id'),
-    _valueInt32,
+    valueString,
+    ..._encodeString('id'),
+    valueInt32,
     ..._to32(id),
-    _valueString,
-    'viewType'.length,
-    ...utf8.encode('viewType'),
-    _valueString,
-    viewType.length,
-    ...utf8.encode(viewType),
+    valueString,
+    ..._encodeString('viewType'),
+    valueString,
+    ..._encodeString(viewType),
     if (Platform.isAndroid && !usesAndroidHybridComposition) ...<int>[
-      _valueString,
-      'width'.length,
-      ...utf8.encode('width'),
-      _valueFloat64,
+      valueString,
+      ..._encodeString('width'),
+      // This is missing the 64-bit boundary alignment, making the entire
+      // message encoding fragile to changes before this point. Do not add new
+      // variable-length values such as strings before this point.
+      // TODO(stuartmorgan): Fix this to use the actual encoding logic,
+      // including alignment: https://github.com/flutter/flutter/issues/111188
+      valueFloat64,
       ..._to64(width),
-      _valueString,
-      'height'.length,
-      ...utf8.encode('height'),
-      _valueFloat64,
+      valueString,
+      ..._encodeString('height'),
+      valueFloat64,
       ..._to64(height),
-      _valueString,
-      'direction'.length,
-      ...utf8.encode('direction'),
-      _valueInt32,
+      valueString,
+      ..._encodeString('direction'),
+      valueInt32,
       ..._to32(0), // LTR
+      valueString,
+      ..._encodeString('hybridFallback'),
+      if (expectAndroidHybridCompositionFallback) valueTrue
+      else valueFalse,
     ],
     if (Platform.isAndroid && usesAndroidHybridComposition) ...<int>[
-      _valueString,
-      'hybrid'.length,
-      ...utf8.encode('hybrid'),
-      _valueTrue,
-      _valueString,
-      'direction'.length,
-      ...utf8.encode('direction'),
-      _valueInt32,
+      valueString,
+      ..._encodeString('hybrid'),
+      valueTrue,
+      valueString,
+      ..._encodeString('direction'),
+      valueInt32,
       ..._to32(0), // LTR
     ],
-    _valueString,
-    'params'.length,
-    ...utf8.encode('params'),
-    _valueUint8List,
-    text.length,
-    ...utf8.encode(text),
+    valueString,
+    ..._encodeString('params'),
+    valueUint8List,
+    ..._encodeString(text),
   ]);
 
   dispatcher.sendPlatformMessage(
@@ -1179,11 +1399,17 @@ void addPlatformView(
       if (response != null &&
           Platform.isAndroid &&
           !usesAndroidHybridComposition) {
-        // This is the texture ID.
         assert(response.getUint8(0) == 0, 'expected envelope');
         final int type = response.getUint8(1);
-        assert(type == 4, 'expected int64');
-        textureId = response.getInt64(2, Endian.host);
+        if (expectAndroidHybridCompositionFallback) {
+          // Fallback is indicated with a null return.
+          assert(type == 0, 'expected null');
+          textureId = -1;
+        } else {
+          // This is the texture ID.
+          assert(type == 4, 'expected int64');
+          textureId = response.getInt64(2, Endian.host);
+        }
       } else {
         // There no texture ID.
         textureId = -1;
@@ -1205,8 +1431,12 @@ Future<void> addPlatformViewToSceneBuilder(
   if (Platform.isIOS) {
     sceneBuilder.addPlatformView(id, width: width, height: height);
   } else if (Platform.isAndroid) {
-    final bool? usesAndroidHybridComposition = scenarioParams['use_android_view'] as bool?;
-    if (usesAndroidHybridComposition != null && usesAndroidHybridComposition) {
+    final bool expectAndroidHybridCompositionFallback =
+      scenarioParams['expect_android_view_fallback'] as bool? ?? false;
+    final bool usesAndroidHybridComposition =
+      (scenarioParams['use_android_view'] as bool? ?? false) ||
+      expectAndroidHybridCompositionFallback;
+    if (usesAndroidHybridComposition) {
       sceneBuilder.addPlatformView(id, width: width, height: height);
     } else if (textureId != -1) {
       sceneBuilder.addTexture(textureId, width: width, height: height);

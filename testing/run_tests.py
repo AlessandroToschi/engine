@@ -17,7 +17,10 @@ import re
 import subprocess
 import sys
 import time
+import csv
+import xvfb
 
+script_dir = os.path.dirname(os.path.realpath(__file__))
 buildroot_dir = os.path.abspath(
     os.path.join(os.path.realpath(__file__), '..', '..', '..')
 )
@@ -29,7 +32,8 @@ fonts_dir = os.path.join(
 roboto_font_path = os.path.join(fonts_dir, 'Roboto-Regular.ttf')
 font_subset_dir = os.path.join(buildroot_dir, 'flutter', 'tools', 'font-subset')
 
-fml_unittests_filter = '--gtest_filter=-*TimeSensitiveTest*'
+FML_UNITTESTS_FILTER = '--gtest_filter=-*TimeSensitiveTest*'
+ENCODING = 'UTF-8'
 
 
 def PrintDivider(char='='):
@@ -37,6 +41,14 @@ def PrintDivider(char='='):
   for _ in range(4):
     print(''.join([char for _ in range(80)]))
   print('\n')
+
+
+def IsAsan(build_dir):
+  with open(os.path.join(build_dir, 'args.gn')) as args:
+    if 'is_asan = true' in args.read():
+      return True
+
+  return False
 
 
 def RunCmd(cmd, forbidden_output=[], expect_failure=False, env=None, **kwargs):
@@ -297,6 +309,12 @@ class EngineExecutableTask(object):
     return " ".join(command)
 
 
+shuffle_flags = [
+    "--gtest_repeat=2",
+    "--gtest_shuffle",
+]
+
+
 def RunCCTests(build_dir, filter, coverage, capture_core_dump):
   print("Running Engine Unit-tests.")
 
@@ -305,11 +323,6 @@ def RunCCTests(build_dir, filter, coverage, capture_core_dump):
     resource.setrlimit(
         resource.RLIMIT_CORE, (resource.RLIM_INFINITY, resource.RLIM_INFINITY)
     )
-
-  shuffle_flags = [
-      "--gtest_repeat=2",
-      "--gtest_shuffle",
-  ]
 
   repeat_flags = [
       "--repeat=2",
@@ -329,7 +342,7 @@ def RunCCTests(build_dir, filter, coverage, capture_core_dump):
       make_test('embedder_a11y_unittests'),
       make_test('embedder_proctable_unittests'),
       make_test('embedder_unittests'),
-      make_test('fml_unittests', flags=[fml_unittests_filter] + repeat_flags),
+      make_test('fml_unittests', flags=[FML_UNITTESTS_FILTER] + repeat_flags),
       make_test('no_dart_plugin_registrant_unittests'),
       make_test('runtime_unittests'),
       make_test('testing_unittests'),
@@ -409,14 +422,40 @@ def RunCCTests(build_dir, filter, coverage, capture_core_dump):
         shuffle_flags,
         coverage=coverage
     )
+    # TODO(117122): Re-enable impeller_unittests after shader compiler errors
+    #               are addressed.
     # Impeller tests are only supported on macOS for now.
-    RunEngineExecutable(
-        build_dir,
-        'impeller_unittests',
-        filter,
-        shuffle_flags,
-        coverage=coverage
-    )
+    # RunEngineExecutable(
+    #     build_dir,
+    #     'impeller_unittests',
+    #     filter,
+    #     shuffle_flags,
+    #     coverage=coverage,
+    #     extra_env={
+    #         # See https://developer.apple.com/documentation/metal/diagnosing_metal_programming_issues_early?language=objc
+    #         'MTL_SHADER_VALIDATION':
+    #             '1',  # Enables all shader validation tests.
+    #         'MTL_SHADER_VALIDATION_GLOBAL_MEMORY':
+    #             '1',  # Validates accesses to device and constant memory.
+    #         'MTL_SHADER_VALIDATION_THREADGROUP_MEMORY':
+    #             '1',  # Validates accesses to threadgroup memory.
+    #         'MTL_SHADER_VALIDATION_TEXTURE_USAGE':
+    #             '1',  # Validates that texture references are not nil.
+    #     }
+    # )
+
+
+def ParseImpellerVulkanFilter():
+  test_status_path = os.path.join(script_dir, 'impeller_vulkan_test_status.csv')
+  gtest_filter = '--gtest_filter="'
+  with open(test_status_path, 'r') as csvfile:
+    csvreader = csv.reader(csvfile)
+    next(csvreader)  # Skip header.
+    for row in csvreader:
+      if row[1] == 'pass':
+        gtest_filter += '*%s:' % row[0]
+  gtest_filter += '"'
+  return gtest_filter
 
 
 def RunEngineBenchmarks(build_dir, filter):
@@ -431,6 +470,12 @@ def RunEngineBenchmarks(build_dir, filter):
   RunEngineExecutable(build_dir, 'fml_benchmarks', filter, icu_flags)
 
   RunEngineExecutable(build_dir, 'ui_benchmarks', filter, icu_flags)
+
+  RunEngineExecutable(
+      build_dir, 'display_list_builder_benchmarks', filter, icu_flags
+  )
+
+  RunEngineExecutable(build_dir, 'geometry_benchmarks', filter, icu_flags)
 
   if IsLinux():
     RunEngineExecutable(build_dir, 'txt_benchmarks', filter, icu_flags)
@@ -527,8 +572,13 @@ def EnsureIosTestsAreBuilt(ios_out_dir):
 def AssertExpectedXcodeVersion():
   """Checks that the user has a version of Xcode installed"""
   version_output = subprocess.check_output(['xcodebuild', '-version'])
-  match = re.match(b"Xcode (\d+)", version_output)
-  message = "Xcode must be installed to run the iOS embedding unit tests"
+  # TODO ricardoamador: remove this check when python 2 is deprecated.
+  version_output = version_output if isinstance(
+      version_output, str
+  ) else version_output.decode(ENCODING)
+  version_output = version_output.strip()
+  match = re.match(r'Xcode (\d+)', version_output)
+  message = 'Xcode must be installed to run the iOS embedding unit tests'
   assert match, message
 
 
@@ -769,6 +819,24 @@ def GatherFrontEndServerTests(build_dir):
     )
 
 
+def GatherPathOpsTests(build_dir):
+  # TODO(dnfield): https://github.com/flutter/flutter/issues/107321
+  if IsAsan(build_dir):
+    return
+
+  test_dir = os.path.join(
+      buildroot_dir, 'flutter', 'tools', 'path_ops', 'dart', 'test'
+  )
+  opts = ['--disable-dart-dev', os.path.join(test_dir, 'path_ops_test.dart')]
+  yield EngineExecutableTask(
+      build_dir,
+      os.path.join('dart-sdk', 'bin', 'dart'),
+      None,
+      flags=opts,
+      cwd=test_dir
+  )
+
+
 def GatherConstFinderTests(build_dir):
   test_dir = os.path.join(
       buildroot_dir, 'flutter', 'tools', 'const_finder', 'test'
@@ -777,7 +845,8 @@ def GatherConstFinderTests(build_dir):
       '--disable-dart-dev',
       os.path.join(test_dir, 'const_finder_test.dart'),
       os.path.join(build_dir, 'gen', 'frontend_server.dart.snapshot'),
-      os.path.join(build_dir, 'flutter_patched_sdk')
+      os.path.join(build_dir, 'flutter_patched_sdk'),
+      os.path.join(build_dir, 'dart-sdk', 'lib', 'libraries.json')
   ]
   yield EngineExecutableTask(
       build_dir,
@@ -1022,15 +1091,34 @@ def main():
         build_dir, engine_filter, args.coverage, args.engine_capture_core_dump
     )
 
+  # Use this type to exclusively run impeller vulkan tests.
+  # TODO (https://github.com/flutter/flutter/issues/113961): Remove this once
+  # impeller vulkan tests are stable.
+  if 'impeller-vulkan' in types:
+    build_name = args.variant
+    try:
+      xvfb.StartVirtualX(build_name, build_dir)
+      vulkan_gtest_filter = ParseImpellerVulkanFilter()
+      gtest_flags = shuffle_flags
+      gtest_flags.append(vulkan_gtest_filter)
+      RunEngineExecutable(
+          build_dir,
+          'impeller_unittests',
+          engine_filter,
+          gtest_flags,
+          coverage=args.coverage
+      )
+    finally:
+      xvfb.StopVirtualX(build_name)
+
   if 'dart' in types:
-    assert not IsWindows(
-    ), "Dart tests can't be run on windows. https://github.com/flutter/flutter/issues/36301."
     dart_filter = args.dart_filter.split(',') if args.dart_filter else None
     tasks = list(GatherDartSmokeTest(build_dir, args.verbose_dart_snapshot))
     tasks += list(GatherLitetestTests(build_dir))
     tasks += list(GatherGithooksTests(build_dir))
     tasks += list(GatherClangTidyTests(build_dir))
     tasks += list(GatherApiConsistencyTests(build_dir))
+    tasks += list(GatherPathOpsTests(build_dir))
     tasks += list(GatherConstFinderTests(build_dir))
     tasks += list(GatherFrontEndServerTests(build_dir))
     tasks += list(

@@ -8,6 +8,7 @@
 #include <sstream>
 
 #include "flutter/fml/logging.h"
+#include "impeller/compiler/utilities.h"
 
 namespace impeller {
 namespace compiler {
@@ -57,25 +58,45 @@ std::string TargetPlatformToString(TargetPlatform platform) {
       return "MetalDesktop";
     case TargetPlatform::kMetalIOS:
       return "MetaliOS";
-    case TargetPlatform::kFlutterSPIRV:
-      return "FlutterSPIRV";
     case TargetPlatform::kOpenGLES:
       return "OpenGLES";
     case TargetPlatform::kOpenGLDesktop:
       return "OpenGLDesktop";
+    case TargetPlatform::kVulkan:
+      return "Vulkan";
     case TargetPlatform::kRuntimeStageMetal:
       return "RuntimeStageMetal";
     case TargetPlatform::kRuntimeStageGLES:
       return "RuntimeStageGLES";
+    case TargetPlatform::kSkSL:
+      return "SkSL";
   }
   FML_UNREACHABLE();
 }
 
-std::string EntryPointFunctionNameFromSourceName(const std::string& file_name,
-                                                 SourceType type) {
+std::string SourceLanguageToString(SourceLanguage source_language) {
+  switch (source_language) {
+    case SourceLanguage::kUnknown:
+      return "Unknown";
+    case SourceLanguage::kGLSL:
+      return "GLSL";
+    case SourceLanguage::kHLSL:
+      return "HLSL";
+  }
+}
+
+std::string EntryPointFunctionNameFromSourceName(
+    const std::string& file_name,
+    SourceType type,
+    SourceLanguage source_language,
+    const std::string& entry_point_name) {
+  if (source_language == SourceLanguage::kHLSL) {
+    return entry_point_name;
+  }
+
   std::stringstream stream;
   std::filesystem::path file_path(file_name);
-  stream << ToUtf8(file_path.stem().native()) << "_";
+  stream << Utf8FromPath(file_path.stem()) << "_";
   switch (type) {
     case SourceType::kUnknown:
       stream << "unknown";
@@ -108,9 +129,10 @@ bool TargetPlatformNeedsSL(TargetPlatform platform) {
     case TargetPlatform::kOpenGLDesktop:
     case TargetPlatform::kRuntimeStageMetal:
     case TargetPlatform::kRuntimeStageGLES:
+    case TargetPlatform::kSkSL:
+    case TargetPlatform::kVulkan:
       return true;
     case TargetPlatform::kUnknown:
-    case TargetPlatform::kFlutterSPIRV:
       return false;
   }
   FML_UNREACHABLE();
@@ -124,9 +146,10 @@ bool TargetPlatformNeedsReflection(TargetPlatform platform) {
     case TargetPlatform::kOpenGLDesktop:
     case TargetPlatform::kRuntimeStageMetal:
     case TargetPlatform::kRuntimeStageGLES:
+    case TargetPlatform::kVulkan:
       return true;
     case TargetPlatform::kUnknown:
-    case TargetPlatform::kFlutterSPIRV:
+    case TargetPlatform::kSkSL:
       return false;
   }
   FML_UNREACHABLE();
@@ -201,10 +224,11 @@ spirv_cross::CompilerMSL::Options::Platform TargetPlatformToMSLPlatform(
       return spirv_cross::CompilerMSL::Options::Platform::iOS;
     case TargetPlatform::kMetalDesktop:
       return spirv_cross::CompilerMSL::Options::Platform::macOS;
-    case TargetPlatform::kFlutterSPIRV:
+    case TargetPlatform::kSkSL:
     case TargetPlatform::kOpenGLES:
     case TargetPlatform::kOpenGLDesktop:
     case TargetPlatform::kRuntimeStageGLES:
+    case TargetPlatform::kVulkan:
     case TargetPlatform::kUnknown:
       return spirv_cross::CompilerMSL::Options::Platform::macOS;
   }
@@ -237,22 +261,15 @@ std::string TargetPlatformSLExtension(TargetPlatform platform) {
     case TargetPlatform::kMetalIOS:
     case TargetPlatform::kRuntimeStageMetal:
       return "metal";
-    case TargetPlatform::kFlutterSPIRV:
+    case TargetPlatform::kSkSL:
     case TargetPlatform::kOpenGLES:
     case TargetPlatform::kOpenGLDesktop:
     case TargetPlatform::kRuntimeStageGLES:
       return "glsl";
+    case TargetPlatform::kVulkan:
+      return "vk.spirv";
   }
   FML_UNREACHABLE();
-}
-
-std::string ToUtf8(const std::wstring& wstring) {
-  std::wstring_convert<std::codecvt_utf8<wchar_t>> myconv;
-  return myconv.to_bytes(wstring);
-}
-
-std::string ToUtf8(const std::string& string) {
-  return string;
 }
 
 bool TargetPlatformIsOpenGL(TargetPlatform platform) {
@@ -265,7 +282,8 @@ bool TargetPlatformIsOpenGL(TargetPlatform platform) {
     case TargetPlatform::kRuntimeStageMetal:
     case TargetPlatform::kMetalIOS:
     case TargetPlatform::kUnknown:
-    case TargetPlatform::kFlutterSPIRV:
+    case TargetPlatform::kSkSL:
+    case TargetPlatform::kVulkan:
       return false;
   }
   FML_UNREACHABLE();
@@ -278,12 +296,29 @@ bool TargetPlatformIsMetal(TargetPlatform platform) {
     case TargetPlatform::kRuntimeStageMetal:
       return true;
     case TargetPlatform::kUnknown:
-    case TargetPlatform::kFlutterSPIRV:
+    case TargetPlatform::kSkSL:
     case TargetPlatform::kOpenGLES:
     case TargetPlatform::kOpenGLDesktop:
     case TargetPlatform::kRuntimeStageGLES:
+    case TargetPlatform::kVulkan:
       return false;
-      break;
+  }
+  FML_UNREACHABLE();
+}
+
+bool TargetPlatformBundlesSkSL(TargetPlatform platform) {
+  switch (platform) {
+    case TargetPlatform::kSkSL:
+    case TargetPlatform::kRuntimeStageMetal:
+    case TargetPlatform::kRuntimeStageGLES:
+      return true;
+    case TargetPlatform::kMetalDesktop:
+    case TargetPlatform::kMetalIOS:
+    case TargetPlatform::kUnknown:
+    case TargetPlatform::kOpenGLES:
+    case TargetPlatform::kOpenGLDesktop:
+    case TargetPlatform::kVulkan:
+      return false;
   }
   FML_UNREACHABLE();
 }

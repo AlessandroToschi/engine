@@ -10,21 +10,26 @@
 
 #include "flutter/fml/macros.h"
 #include "impeller/entity/contents/contents.h"
+#include "impeller/entity/entity.h"
+#include "impeller/entity/geometry.h"
 #include "impeller/geometry/color.h"
 #include "impeller/geometry/path.h"
 #include "impeller/geometry/point.h"
-#include "impeller/geometry/vertices.h"
 #include "impeller/renderer/sampler_descriptor.h"
 
 namespace impeller {
 
 class VerticesContents final : public Contents {
  public:
-  explicit VerticesContents(Vertices vertices);
+  VerticesContents();
 
   ~VerticesContents() override;
 
+  void SetGeometry(std::unique_ptr<VerticesGeometry> geometry);
+
   void SetColor(Color color);
+
+  void SetBlendMode(BlendMode blend_mode);
 
   // |Contents|
   std::optional<Rect> GetCoverage(const Entity& entity) const override;
@@ -35,8 +40,9 @@ class VerticesContents final : public Contents {
               RenderPass& pass) const override;
 
  public:
-  Vertices vertices_;
   Color color_;
+  std::unique_ptr<VerticesGeometry> geometry_;
+  BlendMode blend_mode_ = BlendMode::kSource;
 
   FML_DISALLOW_COPY_AND_ASSIGN(VerticesContents);
 };

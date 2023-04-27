@@ -4,17 +4,25 @@
 
 #include "impeller/compiler/compiler.h"
 
+#include <array>
 #include <filesystem>
 #include <memory>
 #include <sstream>
+#include <utility>
 
 #include "flutter/fml/paths.h"
+#include "impeller/base/allocation.h"
 #include "impeller/compiler/compiler_backend.h"
 #include "impeller/compiler/includer.h"
 #include "impeller/compiler/logger.h"
+#include "impeller/compiler/types.h"
 
 namespace impeller {
 namespace compiler {
+
+const uint32_t kFragBindingBase = 128;
+const size_t kNumUniformKinds =
+    static_cast<int>(shaderc_uniform_kind::shaderc_uniform_kind_buffer) + 1;
 
 static CompilerBackend CreateMSLCompiler(const spirv_cross::ParsedIR& ir,
                                          const SourceOptions& source_options) {
@@ -27,7 +35,46 @@ static CompilerBackend CreateMSLCompiler(const spirv_cross::ParsedIR& ir,
   sl_options.msl_version =
       spirv_cross::CompilerMSL::Options::make_msl_version(1, 2);
   sl_compiler->set_msl_options(sl_options);
-  return sl_compiler;
+
+  // Set metal resource mappings to be consistent with location based mapping
+  // used on other backends when creating fragment shaders. This doesn't seem
+  // to work with the generated bindings for compute shaders, nor for certain
+  // shaders in the flutter/engine tree.
+  if (source_options.remap_samplers) {
+    std::vector<uint32_t> sampler_offsets;
+    ir.for_each_typed_id<spirv_cross::SPIRVariable>(
+        [&](uint32_t, const spirv_cross::SPIRVariable& var) {
+          if (var.storage != spv::StorageClassUniformConstant) {
+            return;
+          }
+          const auto spir_type = sl_compiler->get_type(var.basetype);
+          auto location = sl_compiler->get_decoration(
+              var.self, spv::Decoration::DecorationLocation);
+          if (spir_type.basetype ==
+              spirv_cross::SPIRType::BaseType::SampledImage) {
+            sampler_offsets.push_back(location);
+          }
+        });
+    if (sampler_offsets.size() > 0) {
+      auto start_offset =
+          *std::min_element(sampler_offsets.begin(), sampler_offsets.end());
+      for (auto offset : sampler_offsets) {
+        sl_compiler->add_msl_resource_binding({
+            .stage = spv::ExecutionModel::ExecutionModelFragment,
+            .basetype = spirv_cross::SPIRType::BaseType::SampledImage,
+            .binding = offset,
+            .count = 1u,
+            // A sampled image is both an image and a sampler, so both
+            // offsets need to be set or depending on the partiular shader
+            // the bindings may be incorrect.
+            .msl_texture = offset - start_offset,
+            .msl_sampler = offset - start_offset,
+        });
+      }
+    }
+  }
+
+  return CompilerBackend(sl_compiler);
 }
 
 static CompilerBackend CreateGLSLCompiler(const spirv_cross::ParsedIR& ir,
@@ -37,14 +84,24 @@ static CompilerBackend CreateGLSLCompiler(const spirv_cross::ParsedIR& ir,
   sl_options.force_zero_initialized_variables = true;
   sl_options.vertex.fixup_clipspace = true;
   if (source_options.target_platform == TargetPlatform::kOpenGLES) {
-    sl_options.version = 100;
+    sl_options.version = source_options.gles_language_version > 0
+                             ? source_options.gles_language_version
+                             : 100;
     sl_options.es = true;
   } else {
-    sl_options.version = 120;
+    sl_options.version = source_options.gles_language_version > 0
+                             ? source_options.gles_language_version
+                             : 120;
     sl_options.es = false;
   }
   gl_compiler->set_common_options(sl_options);
-  return gl_compiler;
+  return CompilerBackend(gl_compiler);
+}
+
+static CompilerBackend CreateSkSLCompiler(const spirv_cross::ParsedIR& ir,
+                                          const SourceOptions& source_options) {
+  auto sksl_compiler = std::make_shared<CompilerSkSL>(ir);
+  return CompilerBackend(sksl_compiler);
 }
 
 static bool EntryPointMustBeNamedMain(TargetPlatform platform) {
@@ -53,9 +110,10 @@ static bool EntryPointMustBeNamedMain(TargetPlatform platform) {
       FML_UNREACHABLE();
     case TargetPlatform::kMetalDesktop:
     case TargetPlatform::kMetalIOS:
+    case TargetPlatform::kVulkan:
     case TargetPlatform::kRuntimeStageMetal:
       return false;
-    case TargetPlatform::kFlutterSPIRV:
+    case TargetPlatform::kSkSL:
     case TargetPlatform::kOpenGLES:
     case TargetPlatform::kOpenGLDesktop:
     case TargetPlatform::kRuntimeStageGLES:
@@ -72,28 +130,158 @@ static CompilerBackend CreateCompiler(const spirv_cross::ParsedIR& ir,
     case TargetPlatform::kMetalIOS:
     case TargetPlatform::kRuntimeStageMetal:
     case TargetPlatform::kRuntimeStageGLES:
+    case TargetPlatform::kVulkan:
       compiler = CreateMSLCompiler(ir, source_options);
       break;
     case TargetPlatform::kUnknown:
-    case TargetPlatform::kFlutterSPIRV:
     case TargetPlatform::kOpenGLES:
     case TargetPlatform::kOpenGLDesktop:
       compiler = CreateGLSLCompiler(ir, source_options);
       break;
+    case TargetPlatform::kSkSL:
+      compiler = CreateSkSLCompiler(ir, source_options);
   }
   if (!compiler) {
     return {};
   }
   auto* backend = compiler.GetCompiler();
-  if (!EntryPointMustBeNamedMain(source_options.target_platform)) {
+  if (!EntryPointMustBeNamedMain(source_options.target_platform) &&
+      source_options.source_language == SourceLanguage::kGLSL) {
     backend->rename_entry_point("main", source_options.entry_point_name,
                                 ToExecutionModel(source_options.type));
   }
   return compiler;
 }
 
+static void SetLimitations(shaderc::CompileOptions& compiler_opts) {
+  using Limit = std::pair<shaderc_limit, int>;
+  static constexpr std::array<Limit, 83> limits = {
+      Limit{shaderc_limit::shaderc_limit_max_lights, 8},
+      Limit{shaderc_limit::shaderc_limit_max_clip_planes, 6},
+      Limit{shaderc_limit::shaderc_limit_max_texture_units, 2},
+      Limit{shaderc_limit::shaderc_limit_max_texture_coords, 8},
+      Limit{shaderc_limit::shaderc_limit_max_vertex_attribs, 16},
+      Limit{shaderc_limit::shaderc_limit_max_vertex_uniform_components, 4096},
+      Limit{shaderc_limit::shaderc_limit_max_varying_floats, 60},
+      Limit{shaderc_limit::shaderc_limit_max_vertex_texture_image_units, 16},
+      Limit{shaderc_limit::shaderc_limit_max_combined_texture_image_units, 80},
+      Limit{shaderc_limit::shaderc_limit_max_texture_image_units, 16},
+      Limit{shaderc_limit::shaderc_limit_max_fragment_uniform_components, 1024},
+      Limit{shaderc_limit::shaderc_limit_max_draw_buffers, 8},
+      Limit{shaderc_limit::shaderc_limit_max_vertex_uniform_vectors, 256},
+      Limit{shaderc_limit::shaderc_limit_max_varying_vectors, 15},
+      Limit{shaderc_limit::shaderc_limit_max_fragment_uniform_vectors, 256},
+      Limit{shaderc_limit::shaderc_limit_max_vertex_output_vectors, 16},
+      Limit{shaderc_limit::shaderc_limit_max_fragment_input_vectors, 15},
+      Limit{shaderc_limit::shaderc_limit_min_program_texel_offset, -8},
+      Limit{shaderc_limit::shaderc_limit_max_program_texel_offset, 7},
+      Limit{shaderc_limit::shaderc_limit_max_clip_distances, 8},
+      Limit{shaderc_limit::shaderc_limit_max_compute_work_group_count_x, 65535},
+      Limit{shaderc_limit::shaderc_limit_max_compute_work_group_count_y, 65535},
+      Limit{shaderc_limit::shaderc_limit_max_compute_work_group_count_z, 65535},
+      Limit{shaderc_limit::shaderc_limit_max_compute_work_group_size_x, 1024},
+      Limit{shaderc_limit::shaderc_limit_max_compute_work_group_size_y, 1024},
+      Limit{shaderc_limit::shaderc_limit_max_compute_work_group_size_z, 64},
+      Limit{shaderc_limit::shaderc_limit_max_compute_uniform_components, 512},
+      Limit{shaderc_limit::shaderc_limit_max_compute_texture_image_units, 16},
+      Limit{shaderc_limit::shaderc_limit_max_compute_image_uniforms, 8},
+      Limit{shaderc_limit::shaderc_limit_max_compute_atomic_counters, 8},
+      Limit{shaderc_limit::shaderc_limit_max_compute_atomic_counter_buffers, 1},
+      Limit{shaderc_limit::shaderc_limit_max_varying_components, 60},
+      Limit{shaderc_limit::shaderc_limit_max_vertex_output_components, 64},
+      Limit{shaderc_limit::shaderc_limit_max_geometry_input_components, 64},
+      Limit{shaderc_limit::shaderc_limit_max_geometry_output_components, 128},
+      Limit{shaderc_limit::shaderc_limit_max_fragment_input_components, 128},
+      Limit{shaderc_limit::shaderc_limit_max_image_units, 8},
+      Limit{shaderc_limit::
+                shaderc_limit_max_combined_image_units_and_fragment_outputs,
+            8},
+      Limit{shaderc_limit::shaderc_limit_max_combined_shader_output_resources,
+            8},
+      Limit{shaderc_limit::shaderc_limit_max_image_samples, 0},
+      Limit{shaderc_limit::shaderc_limit_max_vertex_image_uniforms, 0},
+      Limit{shaderc_limit::shaderc_limit_max_tess_control_image_uniforms, 0},
+      Limit{shaderc_limit::shaderc_limit_max_tess_evaluation_image_uniforms, 0},
+      Limit{shaderc_limit::shaderc_limit_max_geometry_image_uniforms, 0},
+      Limit{shaderc_limit::shaderc_limit_max_fragment_image_uniforms, 8},
+      Limit{shaderc_limit::shaderc_limit_max_combined_image_uniforms, 8},
+      Limit{shaderc_limit::shaderc_limit_max_geometry_texture_image_units, 16},
+      Limit{shaderc_limit::shaderc_limit_max_geometry_output_vertices, 256},
+      Limit{shaderc_limit::shaderc_limit_max_geometry_total_output_components,
+            1024},
+      Limit{shaderc_limit::shaderc_limit_max_geometry_uniform_components, 512},
+      Limit{shaderc_limit::shaderc_limit_max_geometry_varying_components, 60},
+      Limit{shaderc_limit::shaderc_limit_max_tess_control_input_components,
+            128},
+      Limit{shaderc_limit::shaderc_limit_max_tess_control_output_components,
+            128},
+      Limit{shaderc_limit::shaderc_limit_max_tess_control_texture_image_units,
+            16},
+      Limit{shaderc_limit::shaderc_limit_max_tess_control_uniform_components,
+            1024},
+      Limit{
+          shaderc_limit::shaderc_limit_max_tess_control_total_output_components,
+          4096},
+      Limit{shaderc_limit::shaderc_limit_max_tess_evaluation_input_components,
+            128},
+      Limit{shaderc_limit::shaderc_limit_max_tess_evaluation_output_components,
+            128},
+      Limit{
+          shaderc_limit::shaderc_limit_max_tess_evaluation_texture_image_units,
+          16},
+      Limit{shaderc_limit::shaderc_limit_max_tess_evaluation_uniform_components,
+            1024},
+      Limit{shaderc_limit::shaderc_limit_max_tess_patch_components, 120},
+      Limit{shaderc_limit::shaderc_limit_max_patch_vertices, 32},
+      Limit{shaderc_limit::shaderc_limit_max_tess_gen_level, 64},
+      Limit{shaderc_limit::shaderc_limit_max_viewports, 16},
+      Limit{shaderc_limit::shaderc_limit_max_vertex_atomic_counters, 0},
+      Limit{shaderc_limit::shaderc_limit_max_tess_control_atomic_counters, 0},
+      Limit{shaderc_limit::shaderc_limit_max_tess_evaluation_atomic_counters,
+            0},
+      Limit{shaderc_limit::shaderc_limit_max_geometry_atomic_counters, 0},
+      Limit{shaderc_limit::shaderc_limit_max_fragment_atomic_counters, 8},
+      Limit{shaderc_limit::shaderc_limit_max_combined_atomic_counters, 8},
+      Limit{shaderc_limit::shaderc_limit_max_atomic_counter_bindings, 1},
+      Limit{shaderc_limit::shaderc_limit_max_vertex_atomic_counter_buffers, 0},
+      Limit{
+          shaderc_limit::shaderc_limit_max_tess_control_atomic_counter_buffers,
+          0},
+      Limit{shaderc_limit::
+                shaderc_limit_max_tess_evaluation_atomic_counter_buffers,
+            0},
+      Limit{shaderc_limit::shaderc_limit_max_geometry_atomic_counter_buffers,
+            0},
+      Limit{shaderc_limit::shaderc_limit_max_fragment_atomic_counter_buffers,
+            0},
+      Limit{shaderc_limit::shaderc_limit_max_combined_atomic_counter_buffers,
+            1},
+      Limit{shaderc_limit::shaderc_limit_max_atomic_counter_buffer_size, 32},
+      Limit{shaderc_limit::shaderc_limit_max_transform_feedback_buffers, 4},
+      Limit{shaderc_limit::
+                shaderc_limit_max_transform_feedback_interleaved_components,
+            64},
+      Limit{shaderc_limit::shaderc_limit_max_cull_distances, 8},
+      Limit{shaderc_limit::shaderc_limit_max_combined_clip_and_cull_distances,
+            8},
+      Limit{shaderc_limit::shaderc_limit_max_samples, 4},
+  };
+  for (auto& [limit, value] : limits) {
+    compiler_opts.SetLimit(limit, value);
+  }
+}
+
+void Compiler::SetBindingBase(shaderc::CompileOptions& compiler_opts) const {
+  for (size_t uniform_kind = 0; uniform_kind < kNumUniformKinds;
+       uniform_kind++) {
+    compiler_opts.SetBindingBaseForStage(
+        ToShaderCShaderKind(SourceType::kFragmentShader),
+        static_cast<shaderc_uniform_kind>(uniform_kind), kFragBindingBase);
+  }
+}
+
 Compiler::Compiler(const fml::Mapping& source_mapping,
-                   SourceOptions source_options,
+                   const SourceOptions& source_options,
                    Reflector::Options reflector_options)
     : options_(source_options) {
   if (source_mapping.GetMapping() == nullptr) {
@@ -121,12 +309,26 @@ Compiler::Compiler(const fml::Mapping& source_mapping,
   // here are irrelevant and get in the way of generating reflection code.
   spirv_options.SetGenerateDebugInfo();
 
-  // Expects GLSL 4.60 (Core Profile).
-  // https://www.khronos.org/registry/OpenGL/specs/gl/GLSLangSpec.4.60.pdf
-  spirv_options.SetSourceLanguage(
-      shaderc_source_language::shaderc_source_language_glsl);
-  spirv_options.SetForcedVersionProfile(460,
-                                        shaderc_profile::shaderc_profile_core);
+  switch (options_.source_language) {
+    case SourceLanguage::kGLSL:
+      // Expects GLSL 4.60 (Core Profile).
+      // https://www.khronos.org/registry/OpenGL/specs/gl/GLSLangSpec.4.60.pdf
+      spirv_options.SetSourceLanguage(
+          shaderc_source_language::shaderc_source_language_glsl);
+      spirv_options.SetForcedVersionProfile(
+          460, shaderc_profile::shaderc_profile_core);
+      break;
+    case SourceLanguage::kHLSL:
+      spirv_options.SetSourceLanguage(
+          shaderc_source_language::shaderc_source_language_hlsl);
+      break;
+    case SourceLanguage::kUnknown:
+      COMPILER_ERROR << "Source language invalid.";
+      return;
+  }
+
+  SetLimitations(spirv_options);
+
   switch (source_options.target_platform) {
     case TargetPlatform::kMetalDesktop:
     case TargetPlatform::kMetalIOS:
@@ -140,6 +342,15 @@ Compiler::Compiler(const fml::Mapping& source_mapping,
       spirv_options.SetTargetSpirv(
           shaderc_spirv_version::shaderc_spirv_version_1_3);
       break;
+    case TargetPlatform::kVulkan:
+      spirv_options.SetOptimizationLevel(
+          shaderc_optimization_level::shaderc_optimization_level_performance);
+      spirv_options.SetTargetEnvironment(
+          shaderc_target_env::shaderc_target_env_vulkan,
+          shaderc_env_version::shaderc_env_version_vulkan_1_0);
+      spirv_options.SetTargetSpirv(
+          shaderc_spirv_version::shaderc_spirv_version_1_0);
+      break;
     case TargetPlatform::kRuntimeStageMetal:
     case TargetPlatform::kRuntimeStageGLES:
       spirv_options.SetOptimizationLevel(
@@ -149,14 +360,13 @@ Compiler::Compiler(const fml::Mapping& source_mapping,
           shaderc_env_version::shaderc_env_version_opengl_4_5);
       spirv_options.SetTargetSpirv(
           shaderc_spirv_version::shaderc_spirv_version_1_0);
+      spirv_options.AddMacroDefinition("IMPELLER_GRAPHICS_BACKEND");
       break;
-    case TargetPlatform::kFlutterSPIRV:
-      // With any optimization level above 'zero' enabled, shaderc will emit
-      // ops that are not supported by the Engine's SPIR-V -> SkSL transpiler.
-      // In particular, with 'shaderc_optimization_level_size' enabled, it will
-      // generate OpPhi (opcode 245) for test 246_OpLoopMerge.frag instead of
-      // the OpLoopMerge op expected by that test.
-      // See: https://github.com/flutter/flutter/issues/105396.
+    case TargetPlatform::kSkSL:
+      // When any optimization level above 'zero' is enabled, the phi merges at
+      // loop continue blocks are rendered using syntax that is supported in
+      // GLSL, but not in SkSL.
+      // https://bugs.chromium.org/p/skia/issues/detail?id=13518.
       spirv_options.SetOptimizationLevel(
           shaderc_optimization_level::shaderc_optimization_level_zero);
       spirv_options.SetTargetEnvironment(
@@ -164,6 +374,7 @@ Compiler::Compiler(const fml::Mapping& source_mapping,
           shaderc_env_version::shaderc_env_version_opengl_4_5);
       spirv_options.SetTargetSpirv(
           shaderc_spirv_version::shaderc_spirv_version_1_0);
+      spirv_options.AddMacroDefinition("SKIA_GRAPHICS_BACKEND");
       break;
     case TargetPlatform::kUnknown:
       COMPILER_ERROR << "Target platform invalid.";
@@ -178,6 +389,9 @@ Compiler::Compiler(const fml::Mapping& source_mapping,
   }
 
   spirv_options.SetAutoBindUniforms(true);
+#ifdef IMPELLER_ENABLE_VULKAN
+  SetBindingBase(spirv_options);
+#endif
   spirv_options.SetAutoMapLocations(true);
 
   std::vector<std::string> included_file_names;
@@ -189,7 +403,9 @@ Compiler::Compiler(const fml::Mapping& source_mapping,
 
   shaderc::Compiler spv_compiler;
   if (!spv_compiler.IsValid()) {
-    COMPILER_ERROR << "Could not initialize the GLSL to SPIRV compiler.";
+    COMPILER_ERROR << "Could not initialize the "
+                   << SourceLanguageToString(options_.source_language)
+                   << " to SPIRV compiler.";
     return;
   }
 
@@ -206,7 +422,8 @@ Compiler::Compiler(const fml::Mapping& source_mapping,
           ));
   if (spv_result_->GetCompilationStatus() !=
       shaderc_compilation_status::shaderc_compilation_status_success) {
-    COMPILER_ERROR << "GLSL to SPIRV failed; "
+    COMPILER_ERROR << SourceLanguageToString(options_.source_language)
+                   << " to SPIRV failed; "
                    << ShaderCErrorToString(spv_result_->GetCompilationStatus())
                    << ". " << spv_result_->GetNumErrors() << " error(s) and "
                    << spv_result_->GetNumWarnings() << " warning(s).";
@@ -240,10 +457,20 @@ Compiler::Compiler(const fml::Mapping& source_mapping,
     return;
   }
 
-  sl_string_ =
-      std::make_shared<std::string>(sl_compiler.GetCompiler()->compile());
+  // We need to invoke the compiler even if we don't use the SL mapping later
+  // for Vulkan. The reflector needs information that is only valid after a
+  // successful compilation call.
+  auto sl_compilation_result =
+      CreateMappingWithString(sl_compiler.GetCompiler()->compile());
 
-  if (!sl_string_) {
+  // If the target is Vulkan, our shading language is SPIRV which we already
+  // have. If it isn't, we need to invoke the appropriate compiler to compile
+  // the SPIRV to the target SL.
+  sl_mapping_ = source_options.target_platform == TargetPlatform::kVulkan
+                    ? GetSPIRVAssembly()
+                    : sl_compilation_result;
+
+  if (!sl_mapping_) {
     COMPILER_ERROR << "Could not generate SL from SPIRV";
     return;
   }
@@ -277,15 +504,8 @@ std::unique_ptr<fml::Mapping> Compiler::GetSPIRVAssembly() const {
       [result = spv_result_](auto, auto) mutable { result.reset(); });
 }
 
-std::unique_ptr<fml::Mapping> Compiler::GetSLShaderSource() const {
-  if (!sl_string_) {
-    return nullptr;
-  }
-
-  return std::make_unique<fml::NonOwnedMapping>(
-      reinterpret_cast<const uint8_t*>(sl_string_->c_str()),
-      sl_string_->length(),
-      [string = sl_string_](auto, auto) mutable { string.reset(); });
+std::shared_ptr<fml::Mapping> Compiler::GetSLShaderSource() const {
+  return sl_mapping_;
 }
 
 bool Compiler::IsValid() const {
@@ -307,7 +527,7 @@ const std::vector<std::string>& Compiler::GetIncludedFileNames() const {
 }
 
 static std::string JoinStrings(std::vector<std::string> items,
-                               std::string separator) {
+                               const std::string& separator) {
   std::stringstream stream;
   for (size_t i = 0, count = items.size(); i < count; i++) {
     const auto is_last = (i == count - 1);
@@ -320,7 +540,7 @@ static std::string JoinStrings(std::vector<std::string> items,
   return stream.str();
 }
 
-std::string Compiler::GetDependencyNames(std::string separator) const {
+std::string Compiler::GetDependencyNames(const std::string& separator) const {
   std::vector<std::string> dependencies = included_file_names_;
   dependencies.push_back(options_.file_name);
   return JoinStrings(dependencies, separator);
@@ -328,6 +548,7 @@ std::string Compiler::GetDependencyNames(std::string separator) const {
 
 std::unique_ptr<fml::Mapping> Compiler::CreateDepfileContents(
     std::initializer_list<std::string> targets_names) const {
+  // https://github.com/ninja-build/ninja/blob/master/src/depfile_parser.cc#L28
   const auto targets = JoinStrings(targets_names, " ");
   const auto dependencies = GetDependencyNames(" ");
 

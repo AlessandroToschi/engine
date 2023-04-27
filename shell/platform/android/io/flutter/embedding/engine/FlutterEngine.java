@@ -23,6 +23,7 @@ import io.flutter.embedding.engine.plugins.service.ServiceControlSurface;
 import io.flutter.embedding.engine.plugins.util.GeneratedPluginRegister;
 import io.flutter.embedding.engine.renderer.FlutterRenderer;
 import io.flutter.embedding.engine.renderer.RenderSurface;
+import io.flutter.embedding.engine.renderer.Task;
 import io.flutter.embedding.engine.systemchannels.AccessibilityChannel;
 import io.flutter.embedding.engine.systemchannels.DeferredComponentChannel;
 import io.flutter.embedding.engine.systemchannels.LifecycleChannel;
@@ -393,7 +394,10 @@ public class FlutterEngine {
       @NonNull Context context,
       @NonNull DartEntrypoint dartEntrypoint,
       @Nullable String initialRoute,
-      @Nullable List<String> dartEntrypointArgs) {
+      @Nullable List<String> dartEntrypointArgs,
+      @Nullable PlatformViewsController platformViewsController,
+      boolean automaticallyRegisterPlugins,
+      boolean waitForRestorationData) {
     if (!isAttachedToJni()) {
       throw new IllegalStateException(
           "Spawn can only be called on a fully constructed FlutterEngine");
@@ -409,7 +413,11 @@ public class FlutterEngine {
         context, // Context.
         null, // FlutterLoader. A null value passed here causes the constructor to get it from the
         // FlutterInjector.
-        newFlutterJNI); // FlutterJNI.
+        newFlutterJNI, // FlutterJNI.
+        platformViewsController, // PlatformViewsController.
+        null, // String[]. The Dart VM has already started, this arguments will have no effect.
+        automaticallyRegisterPlugins, // boolean.
+        waitForRestorationData); // boolean
   }
 
   /**
@@ -614,5 +622,9 @@ public class FlutterEngine {
      * <p>For the duration of the call, the Flutter engine is still valid.
      */
     void onEngineWillDestroy();
+  }
+
+  public void runOnRasterThread(Task task) {
+    this.flutterJNI.runOnRasterThread(task);
   }
 }

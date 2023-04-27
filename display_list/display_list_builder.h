@@ -28,7 +28,10 @@ class DisplayListBuilder final : public virtual Dispatcher,
                                  public SkRefCnt,
                                  DisplayListOpFlags {
  public:
-  explicit DisplayListBuilder(const SkRect& cull_rect = kMaxCullRect_);
+  static constexpr SkRect kMaxCullRect =
+      SkRect::MakeLTRB(-1E9F, -1E9F, 1E9F, 1E9F);
+
+  explicit DisplayListBuilder(const SkRect& cull_rect = kMaxCullRect);
 
   ~DisplayListBuilder();
 
@@ -206,7 +209,7 @@ class DisplayListBuilder final : public virtual Dispatcher,
   /// Returns the 3x3 partial perspective transform representing all transform
   /// operations executed so far in this DisplayList within the enclosing
   /// save stack.
-  SkMatrix getTransform() { return current_layer_->matrix.asM33(); }
+  SkMatrix getTransform() const { return current_layer_->matrix.asM33(); }
 
   void clipRect(const SkRect& rect, SkClipOp clip_op, bool is_aa) override;
   void clipRRect(const SkRRect& rrect, SkClipOp clip_op, bool is_aa) override;
@@ -220,6 +223,11 @@ class DisplayListBuilder final : public virtual Dispatcher,
   /// transformed into the local coordinate space in which currently
   /// recorded rendering operations are interpreted.
   SkRect getLocalClipBounds();
+
+  /// Return true iff the supplied bounds are easily shown to be outside
+  /// of the current clip bounds. This method may conservatively return
+  /// false if it cannot make the determination.
+  bool quickReject(const SkRect& bounds) const;
 
   void drawPaint() override;
   void drawPaint(const DlPaint& paint);
@@ -275,7 +283,7 @@ class DisplayListBuilder final : public virtual Dispatcher,
                  const SkPoint point,
                  DlImageSampling sampling,
                  bool render_with_attributes) override;
-  void drawImage(const sk_sp<DlImage> image,
+  void drawImage(const sk_sp<DlImage>& image,
                  const SkPoint point,
                  DlImageSampling sampling,
                  const DlPaint* paint = nullptr);
@@ -287,7 +295,7 @@ class DisplayListBuilder final : public virtual Dispatcher,
       bool render_with_attributes,
       SkCanvas::SrcRectConstraint constraint =
           SkCanvas::SrcRectConstraint::kFast_SrcRectConstraint) override;
-  void drawImageRect(const sk_sp<DlImage> image,
+  void drawImageRect(const sk_sp<DlImage>& image,
                      const SkRect& src,
                      const SkRect& dst,
                      DlImageSampling sampling,
@@ -299,7 +307,7 @@ class DisplayListBuilder final : public virtual Dispatcher,
                      const SkRect& dst,
                      DlFilterMode filter,
                      bool render_with_attributes) override;
-  void drawImageNine(const sk_sp<DlImage> image,
+  void drawImageNine(const sk_sp<DlImage>& image,
                      const SkIRect& center,
                      const SkRect& dst,
                      DlFilterMode filter,
@@ -318,7 +326,7 @@ class DisplayListBuilder final : public virtual Dispatcher,
                  DlImageSampling sampling,
                  const SkRect* cullRect,
                  bool render_with_attributes) override;
-  void drawAtlas(const sk_sp<DlImage> atlas,
+  void drawAtlas(const sk_sp<DlImage>& atlas,
                  const SkRSXform xform[],
                  const SkRect tex[],
                  const DlColor colors[],
@@ -334,6 +342,10 @@ class DisplayListBuilder final : public virtual Dispatcher,
   void drawTextBlob(const sk_sp<SkTextBlob> blob,
                     SkScalar x,
                     SkScalar y) override;
+  void drawTextBlob(const sk_sp<SkTextBlob>& blob,
+                    SkScalar x,
+                    SkScalar y,
+                    const DlPaint& paint);
   void drawShadow(const SkPath& path,
                   const DlColor color,
                   const SkScalar elevation,
@@ -343,6 +355,8 @@ class DisplayListBuilder final : public virtual Dispatcher,
   sk_sp<DisplayList> Build();
 
  private:
+  void checkForDeferredSave();
+
   SkAutoTMalloc<uint8_t> storage_;
   size_t used_ = 0;
   size_t allocated_ = 0;
@@ -353,14 +367,13 @@ class DisplayListBuilder final : public virtual Dispatcher,
   int nested_op_count_ = 0;
 
   SkRect cull_rect_;
-  static constexpr SkRect kMaxCullRect_ =
-      SkRect::MakeLTRB(-1E9F, -1E9F, 1E9F, 1E9F);
 
   template <typename T, typename... Args>
   void* Push(size_t extra, int op_inc, Args&&... args);
 
   void setAttributesFromDlPaint(const DlPaint& paint,
                                 const DisplayListAttributeFlags flags);
+  void intersect(const SkRect& rect);
 
   // kInvalidSigma is used to indicate that no MaskBlur is currently set.
   static constexpr SkScalar kInvalidSigma = 0.0;
@@ -395,6 +408,8 @@ class DisplayListBuilder final : public virtual Dispatcher,
     // is handled (e.g., |cannot_inherit_opacity| == false).
     // This offset is only valid if |has_layer| is true.
     size_t save_layer_offset;
+
+    bool has_deferred_save_op_ = false;
 
     bool has_layer;
     bool cannot_inherit_opacity;
@@ -498,7 +513,6 @@ class DisplayListBuilder final : public virtual Dispatcher,
   void onSetColorFilter(const DlColorFilter* filter);
   void onSetPathEffect(const DlPathEffect* effect);
   void onSetMaskFilter(const DlMaskFilter* filter);
-  void onSetMaskBlurFilter(SkBlurStyle style, SkScalar sigma);
 
   DlPaint current_;
   // If |current_blender_| is set then ignore |current_.getBlendMode()|

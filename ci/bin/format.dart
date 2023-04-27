@@ -30,7 +30,7 @@ class FormattingException implements Exception {
     final StringBuffer output = StringBuffer(runtimeType.toString());
     output.write(': $message');
     final String? stderr = result?.stderr as String?;
-    if (stderr?.isNotEmpty == true) {
+    if (stderr?.isNotEmpty ?? false) {
       output.write(':\n$stderr');
     }
     return output.toString();
@@ -71,7 +71,7 @@ FormatCheck nameToFormatCheck(String name) {
 String formatCheckToName(FormatCheck check) {
   switch (check) {
     case FormatCheck.clang:
-      return 'C++/ObjC';
+      return 'C++/ObjC/Shader';
     case FormatCheck.gn:
       return 'GN';
     case FormatCheck.java:
@@ -228,7 +228,6 @@ abstract class FormatChecker {
       return WorkerJob(
         <String>['patch', '-p0'],
         stdinRaw: codeUnitsAsStream(patch.codeUnits),
-        failOk: true,
       );
     }).toList();
     final List<WorkerJob> completedJobs = await patchPool.runToCompletion(jobs);
@@ -302,7 +301,7 @@ abstract class FormatChecker {
   }
 }
 
-/// Checks and formats C++/ObjC files using clang-format.
+/// Checks and formats C++/ObjC/Shader files using clang-format.
 class ClangFormatChecker extends FormatChecker {
   ClangFormatChecker({
     ProcessManager processManager = const LocalProcessManager(),
@@ -351,7 +350,7 @@ class ClangFormatChecker extends FormatChecker {
 
   @override
   Future<bool> fixFormatting() async {
-    message('Fixing C++/ObjC formatting...');
+    message('Fixing C++/ObjC/Shader formatting...');
     final List<String> failures = await _getCFormatFailures(fixing: true);
     if (failures.isEmpty) {
       return true;
@@ -366,7 +365,7 @@ class ClangFormatChecker extends FormatChecker {
   }
 
   Future<List<String>> _getCFormatFailures({bool fixing = false}) async {
-    message('Checking C++/ObjC formatting...');
+    message('Checking C++/ObjC/Shader formatting...');
     const List<String> clangFiletypes = <String>[
       '*.c',
       '*.cc',
@@ -375,10 +374,17 @@ class ClangFormatChecker extends FormatChecker {
       '*.h',
       '*.m',
       '*.mm',
+      '*.glsl',
+      '*.hlsl',
+      '*.comp',
+      '*.tese',
+      '*.tesc',
+      '*.vert',
+      '*.frag',
     ];
     final List<String> files = await getFileList(clangFiletypes);
     if (files.isEmpty) {
-      message('No C++/ObjC files with changes, skipping C++/ObjC format check.');
+      message('No C++/ObjC/Shader files with changes, skipping C++/ObjC/Shader format check.');
       return <String>[];
     }
     if (verbose) {
@@ -401,7 +407,7 @@ class ClangFormatChecker extends FormatChecker {
       if (completedJob.result.exitCode == 0) {
         diffJobs.add(
           WorkerJob(<String>['diff', '-u', completedJob.command.last, '-'],
-              stdinRaw: codeUnitsAsStream(completedJob.result.stdoutRaw), failOk: true),
+              stdinRaw: codeUnitsAsStream(completedJob.result.stdoutRaw)),
         );
       }
     }
@@ -417,10 +423,10 @@ class ClangFormatChecker extends FormatChecker {
     if (failed.isNotEmpty) {
       final bool plural = failed.length > 1;
       if (fixing) {
-        message('Fixing ${failed.length} C++/ObjC file${plural ? 's' : ''}'
+        message('Fixing ${failed.length} C++/ObjC/Shader file${plural ? 's' : ''}'
             ' which ${plural ? 'were' : 'was'} formatted incorrectly.');
       } else {
-        error('Found ${failed.length} C++/ObjC file${plural ? 's' : ''}'
+        error('Found ${failed.length} C++/ObjC/Shader file${plural ? 's' : ''}'
             ' which ${plural ? 'were' : 'was'} formatted incorrectly.');
         stdout.writeln('To fix, run:');
         stdout.writeln();
@@ -432,7 +438,7 @@ class ClangFormatChecker extends FormatChecker {
         stdout.writeln();
       }
     } else {
-      message('Completed checking ${diffJobs.length} C++/ObjC files with no formatting problems.');
+      message('Completed checking ${diffJobs.length} C++/ObjC/Shader files with no formatting problems.');
     }
     return failed.map<String>((WorkerJob job) {
       return job.result.stdout;
@@ -548,7 +554,6 @@ class JavaFormatChecker extends FormatChecker {
           WorkerJob(
             <String>['diff', '-u', completedJob.command.last, '-'],
             stdinRaw: codeUnitsAsStream(completedJob.result.stdoutRaw),
-            failOk: true,
           ),
         );
       }
@@ -949,13 +954,11 @@ Future<int> main(List<String> arguments) async {
   parser.addFlag('help', help: 'Print help.', abbr: 'h');
   parser.addFlag('fix',
       abbr: 'f',
-      help: 'Instead of just checking for formatting errors, fix them in place.',
-      defaultsTo: false);
+      help: 'Instead of just checking for formatting errors, fix them in place.');
   parser.addFlag('all-files',
       abbr: 'a',
       help: 'Instead of just checking for formatting errors in changed files, '
-          'check for them in all files.',
-      defaultsTo: false);
+          'check for them in all files.');
   parser.addMultiOption('check',
       abbr: 'c',
       allowed: formatCheckNames(),
@@ -1012,7 +1015,6 @@ Future<int> main(List<String> arguments) async {
       final FormatCheck check = nameToFormatCheck(checkName);
       final String humanCheckName = formatCheckToName(check);
       final FormatChecker checker = FormatChecker.ofType(check,
-          processManager: processManager,
           baseGitRef: baseGitRef,
           repoDir: repoDir,
           srcDir: srcDir,

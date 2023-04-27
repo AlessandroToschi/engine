@@ -9,8 +9,6 @@ import 'package:ui/ui.dart' as ui;
 
 import '../browser_detection.dart';
 import '../canvas_pool.dart';
-import '../canvaskit/color_filter.dart';
-import '../color_filter.dart';
 import '../dom.dart';
 import '../engine_canvas.dart';
 import '../frame_reference.dart';
@@ -28,16 +26,50 @@ import 'path/path.dart';
 import 'recording_canvas.dart';
 import 'render_vertices.dart';
 import 'shaders/image_shader.dart';
+import 'shaders/shader.dart';
 
 /// A raw HTML canvas that is directly written to.
 class BitmapCanvas extends EngineCanvas {
+  /// Allocates a canvas with enough memory to paint a picture within the given
+  /// [bounds].
+  ///
+  /// This canvas can be reused by pictures with different paint bounds as long
+  /// as the [Rect.size] of the bounds fully fit within the size used to
+  /// initialize this canvas.
+  BitmapCanvas(this._bounds, RenderStrategy renderStrategy,
+      {double density = 1.0})
+      : assert(_bounds != null),
+        _density = density,
+        _renderStrategy = renderStrategy,
+        widthInBitmapPixels = widthToPhysical(_bounds.width),
+        heightInBitmapPixels = heightToPhysical(_bounds.height),
+        _canvasPool = CanvasPool(widthToPhysical(_bounds.width),
+            heightToPhysical(_bounds.height), density) {
+    rootElement.style.position = 'absolute';
+    // Adds one extra pixel to the requested size. This is to compensate for
+    // _initializeViewport() snapping canvas position to 1 pixel, causing
+    // painting to overflow by at most 1 pixel.
+    _canvasPositionX = _bounds.left.floor() - kPaddingPixels;
+    _canvasPositionY = _bounds.top.floor() - kPaddingPixels;
+    _updateRootElementTransform();
+    _canvasPool.mount(rootElement as DomHTMLElement);
+    _setupInitialTransform();
+  }
+
+  /// Constructs bitmap canvas to capture image data.
+  factory BitmapCanvas.imageData(ui.Rect bounds) {
+    final BitmapCanvas bitmapCanvas = BitmapCanvas(bounds, RenderStrategy());
+    bitmapCanvas._preserveImageData = true;
+    return bitmapCanvas;
+  }
+
   /// The rectangle positioned relative to the parent layer's coordinate
   /// system's origin, within which this canvas paints.
   ///
   /// Painting outside these bounds will result in cropping.
   ui.Rect get bounds => _bounds;
   set bounds(ui.Rect newValue) {
-    assert(newValue != null); // ignore: unnecessary_null_comparison
+    assert(newValue != null);
     _bounds = newValue;
     final int newCanvasPositionX = _bounds.left.floor() - kPaddingPixels;
     final int newCanvasPositionY = _bounds.top.floor() - kPaddingPixels;
@@ -136,39 +168,6 @@ class BitmapCanvas extends EngineCanvas {
 
   final RenderStrategy _renderStrategy;
 
-  /// Allocates a canvas with enough memory to paint a picture within the given
-  /// [bounds].
-  ///
-  /// This canvas can be reused by pictures with different paint bounds as long
-  /// as the [Rect.size] of the bounds fully fit within the size used to
-  /// initialize this canvas.
-  BitmapCanvas(this._bounds, RenderStrategy renderStrategy,
-      {double density = 1.0})
-      : assert(_bounds != null), // ignore: unnecessary_null_comparison
-        _density = density,
-        _renderStrategy = renderStrategy,
-        widthInBitmapPixels = widthToPhysical(_bounds.width),
-        heightInBitmapPixels = heightToPhysical(_bounds.height),
-        _canvasPool = CanvasPool(widthToPhysical(_bounds.width),
-            heightToPhysical(_bounds.height), density) {
-    rootElement.style.position = 'absolute';
-    // Adds one extra pixel to the requested size. This is to compensate for
-    // _initializeViewport() snapping canvas position to 1 pixel, causing
-    // painting to overflow by at most 1 pixel.
-    _canvasPositionX = _bounds.left.floor() - kPaddingPixels;
-    _canvasPositionY = _bounds.top.floor() - kPaddingPixels;
-    _updateRootElementTransform();
-    _canvasPool.mount(rootElement as DomHTMLElement);
-    _setupInitialTransform();
-  }
-
-  /// Constructs bitmap canvas to capture image data.
-  factory BitmapCanvas.imageData(ui.Rect bounds) {
-    final BitmapCanvas bitmapCanvas = BitmapCanvas(bounds, RenderStrategy());
-    bitmapCanvas._preserveImageData = true;
-    return bitmapCanvas;
-  }
-
   /// Setup cache for reusing DOM elements across frames.
   void setElementCache(CrossFrameCache<DomHTMLElement>? cache) {
     _elementCache = cache;
@@ -218,7 +217,7 @@ class BitmapCanvas extends EngineCanvas {
 
   // Used by picture to assess if canvas is large enough to reuse as is.
   bool doesFitBounds(ui.Rect newBounds, double newDensity) {
-    assert(newBounds != null); // ignore: unnecessary_null_comparison
+    assert(newBounds != null);
     return widthInBitmapPixels >= widthToPhysical(newBounds.width) &&
         heightInBitmapPixels >= heightToPhysical(newBounds.height) &&
         _density == newDensity;
@@ -366,32 +365,40 @@ class BitmapCanvas extends EngineCanvas {
   /// - Pictures typically have large rect/rounded rectangles as background
   ///   prefer DOM if canvas has not been allocated yet.
   ///
-  bool _useDomForRenderingFill(SurfacePaintData paint) =>
-      _renderStrategy.isInsideSvgFilterTree ||
-      (_preserveImageData == false && _contains3dTransform) ||
+  bool _useDomForRenderingFill(SurfacePaintData paint) {
+    if (_preserveImageData) {
+      return false;
+    }
+    return _renderStrategy.isInsideSvgFilterTree ||
+      _contains3dTransform ||
       (_childOverdraw &&
           !_canvasPool.hasCanvas &&
           paint.maskFilter == null &&
           paint.shader == null &&
           paint.style != ui.PaintingStyle.stroke);
+  }
 
   /// Same as [_useDomForRenderingFill] but allows stroke as well.
   ///
   /// DOM canvas is generated for simple strokes using borders.
-  bool _useDomForRenderingFillAndStroke(SurfacePaintData paint) =>
-      _renderStrategy.isInsideSvgFilterTree ||
-      (_preserveImageData == false && _contains3dTransform) ||
+  bool _useDomForRenderingFillAndStroke(SurfacePaintData paint) {
+    if (_preserveImageData) {
+      return false;
+    }
+    return _renderStrategy.isInsideSvgFilterTree ||
+      _contains3dTransform ||
       ((_childOverdraw ||
               _renderStrategy.hasImageElements ||
               _renderStrategy.hasParagraphs) &&
           !_canvasPool.hasCanvas &&
           paint.maskFilter == null &&
           paint.shader == null);
+  }
 
   @override
   void drawColor(ui.Color color, ui.BlendMode blendMode) {
     final SurfacePaintData paintData = SurfacePaintData()
-      ..color = color
+      ..color = color.value
       ..blendMode = blendMode;
     if (_useDomForRenderingFill(paintData)) {
       drawRect(_computeScreenBounds(_canvasPool.currentTransform), paintData);
@@ -432,13 +439,10 @@ class BitmapCanvas extends EngineCanvas {
   @override
   void drawRect(ui.Rect rect, SurfacePaintData paint) {
     if (_useDomForRenderingFillAndStroke(paint)) {
+      rect = adjustRectForDom(rect, paint);
       final DomHTMLElement element = buildDrawRectElement(
           rect, paint, 'draw-rect', _canvasPool.currentTransform);
-      _drawElement(
-          element,
-          ui.Offset(
-              math.min(rect.left, rect.right), math.min(rect.top, rect.bottom)),
-          paint);
+      _drawElement(element, rect.topLeft, paint);
     } else {
       setUpPaint(paint, rect);
       _canvasPool.drawRect(rect, paint.style);
@@ -474,16 +478,12 @@ class BitmapCanvas extends EngineCanvas {
 
   @override
   void drawRRect(ui.RRect rrect, SurfacePaintData paint) {
-    final ui.Rect rect = rrect.outerRect;
     if (_useDomForRenderingFillAndStroke(paint)) {
+      final ui.Rect rect = adjustRectForDom(rrect.outerRect, paint);
       final DomHTMLElement element = buildDrawRectElement(
           rect, paint, 'draw-rrect', _canvasPool.currentTransform);
       applyRRectBorderRadius(element.style, rrect);
-      _drawElement(
-          element,
-          ui.Offset(
-              math.min(rect.left, rect.right), math.min(rect.top, rect.bottom)),
-          paint);
+      _drawElement(element, rect.topLeft, paint);
     } else {
       setUpPaint(paint, rrect.outerRect);
       _canvasPool.drawRRect(rrect, paint.style);
@@ -501,13 +501,10 @@ class BitmapCanvas extends EngineCanvas {
   @override
   void drawOval(ui.Rect rect, SurfacePaintData paint) {
     if (_useDomForRenderingFill(paint)) {
+      rect = adjustRectForDom(rect, paint);
       final DomHTMLElement element = buildDrawRectElement(
           rect, paint, 'draw-oval', _canvasPool.currentTransform);
-      _drawElement(
-          element,
-          ui.Offset(
-              math.min(rect.left, rect.right), math.min(rect.top, rect.bottom)),
-          paint);
+      _drawElement(element, rect.topLeft, paint);
       element.style.borderRadius =
           '${rect.width / 2.0}px / ${rect.height / 2.0}px';
     } else {
@@ -519,15 +516,11 @@ class BitmapCanvas extends EngineCanvas {
 
   @override
   void drawCircle(ui.Offset c, double radius, SurfacePaintData paint) {
-    final ui.Rect rect = ui.Rect.fromCircle(center: c, radius: radius);
     if (_useDomForRenderingFillAndStroke(paint)) {
+      final ui.Rect rect = adjustRectForDom(ui.Rect.fromCircle(center: c, radius: radius), paint);
       final DomHTMLElement element = buildDrawRectElement(
           rect, paint, 'draw-circle', _canvasPool.currentTransform);
-      _drawElement(
-          element,
-          ui.Offset(
-              math.min(rect.left, rect.right), math.min(rect.top, rect.bottom)),
-          paint);
+      _drawElement(element, rect.topLeft, paint);
       element.style.borderRadius = '50%';
     } else {
       setUpPaint(
@@ -547,21 +540,19 @@ class BitmapCanvas extends EngineCanvas {
       final SurfacePath surfacePath = path as SurfacePath;
       final ui.Rect? pathAsLine = surfacePath.toStraightLine();
       if (pathAsLine != null) {
-        final ui.Rect rect = (pathAsLine.top == pathAsLine.bottom)
+        ui.Rect rect = (pathAsLine.top == pathAsLine.bottom)
             ? ui.Rect.fromLTWH(
                 pathAsLine.left, pathAsLine.top, pathAsLine.width, 1)
             : ui.Rect.fromLTWH(
                 pathAsLine.left, pathAsLine.top, 1, pathAsLine.height);
 
+        rect = adjustRectForDom(rect, paint);
         final DomHTMLElement element = buildDrawRectElement(
             rect, paint, 'draw-rect', _canvasPool.currentTransform);
-        _drawElement(
-            element,
-            ui.Offset(math.min(rect.left, rect.right),
-                math.min(rect.top, rect.bottom)),
-            paint);
+        _drawElement(element, rect.topLeft, paint);
         return;
       }
+
       final ui.Rect? pathAsRect = surfacePath.toRect();
       if (pathAsRect != null) {
         drawRect(pathAsRect, paint);
@@ -585,7 +576,7 @@ class BitmapCanvas extends EngineCanvas {
         }
       }
       _applyFilter(svgElm, paint);
-      _drawElement(svgElm, const ui.Offset(0, 0), paint);
+      _drawElement(svgElm, ui.Offset.zero, paint);
     } else {
       setUpPaint(paint, paint.shader != null ? path.getBounds() : null);
       if (paint.style == null && paint.strokeWidth != null) {
@@ -600,8 +591,7 @@ class BitmapCanvas extends EngineCanvas {
   void _applyFilter(DomElement element, SurfacePaintData paint) {
     if (paint.maskFilter != null) {
       final bool isStroke = paint.style == ui.PaintingStyle.stroke;
-      final String cssColor =
-          paint.color == null ? '#000000' : colorToCssString(paint.color)!;
+      final String cssColor = colorValueToCssString(paint.color)!;
       final double sigma = paint.maskFilter!.webOnlySigma;
       if (browserEngine == BrowserEngine.webkit && !isStroke) {
         // A bug in webkit leaves artifacts when this element is animated
@@ -626,7 +616,9 @@ class BitmapCanvas extends EngineCanvas {
       _applyTargetSize(
           imageElement, image.width.toDouble(), image.height.toDouble());
     }
-    _closeCanvas();
+    if (!_preserveImageData) {
+      _closeCanvas();
+    }
   }
 
   DomHTMLImageElement _reuseOrCreateImage(HtmlImage htmlImage) {
@@ -654,13 +646,12 @@ class BitmapCanvas extends EngineCanvas {
       ui.Image image, ui.Offset p, SurfacePaintData paint) {
     final HtmlImage htmlImage = image as HtmlImage;
     final ui.BlendMode? blendMode = paint.blendMode;
-    final EngineColorFilter? colorFilter =
-        paint.colorFilter as EngineColorFilter?;
+    final EngineHtmlColorFilter? colorFilter = createHtmlColorFilter(paint.colorFilter);
     DomHTMLElement imgElement;
-    if (colorFilter is CkBlendModeColorFilter) {
+    if (colorFilter is ModeHtmlColorFilter) {
       imgElement = _createImageElementWithBlend(
           image, colorFilter.color, colorFilter.blendMode, paint);
-    } else if (colorFilter is CkMatrixColorFilter) {
+    } else if (colorFilter is MatrixHtmlColorFilter) {
       imgElement = _createImageElementWithSvgColorMatrixFilter(
           image, colorFilter.matrix, paint);
     } else {
@@ -668,26 +659,40 @@ class BitmapCanvas extends EngineCanvas {
       imgElement = _reuseOrCreateImage(htmlImage);
     }
     imgElement.style.mixBlendMode = blendModeToCssMixBlendMode(blendMode) ?? '';
-    if (_canvasPool.isClipped) {
-      // Reset width/height since they may have been previously set.
-      imgElement.style..removeProperty('width')..removeProperty('height');
-      final List<DomElement> clipElements = _clipContent(
-          _canvasPool.clipStack!, imgElement, p, _canvasPool.currentTransform);
-      for (final DomElement clipElement in clipElements) {
-        rootElement.append(clipElement);
-        _children.add(clipElement);
-      }
+    if (_preserveImageData && imgElement is DomHTMLImageElement) {
+      // If we're preserving image data, we have to actually draw the image
+      // element onto the canvas.
+      // TODO(jacksongardner): Make this actually work with color filters.
+      setUpPaint(paint, null);
+      _canvasPool.drawImage(imgElement, p);
+      tearDownPaint();
     } else {
-      final String cssTransform = float64ListToCssTransform(
-          transformWithOffset(_canvasPool.currentTransform, p).storage);
-      imgElement.style
-        ..transformOrigin = '0 0 0'
-        ..transform = cssTransform
+      if (_canvasPool.isClipped) {
         // Reset width/height since they may have been previously set.
-        ..removeProperty('width')
-        ..removeProperty('height');
-      rootElement.append(imgElement);
-      _children.add(imgElement);
+        imgElement.style
+          ..removeProperty('width')
+          ..removeProperty('height');
+        final List<DomElement> clipElements = _clipContent(
+            _canvasPool.clipStack!,
+            imgElement,
+            p,
+            _canvasPool.currentTransform);
+        for (final DomElement clipElement in clipElements) {
+          rootElement.append(clipElement);
+          _children.add(clipElement);
+        }
+      } else {
+        final String cssTransform = float64ListToCssTransform(
+            transformWithOffset(_canvasPool.currentTransform, p).storage);
+        imgElement.style
+          ..transformOrigin = '0 0 0'
+          ..transform = cssTransform
+          // Reset width/height since they may have been previously set.
+          ..removeProperty('width')
+          ..removeProperty('height');
+        rootElement.append(imgElement);
+        _children.add(imgElement);
+      }
     }
     return imgElement;
   }
@@ -889,9 +894,11 @@ class BitmapCanvas extends EngineCanvas {
     _cachedLastCssFont = null;
   }
 
-  void setCssFont(String cssFont) {
+  void setCssFont(String cssFont, ui.TextDirection textDirection) {
+    final DomCanvasRenderingContext2D ctx = _canvasPool.context;
+    ctx.direction = textDirection == ui.TextDirection.ltr ? 'ltr' : 'rtl';
+
     if (cssFont != _cachedLastCssFont) {
-      final DomCanvasRenderingContext2D ctx = _canvasPool.context;
       ctx.font = cssFont;
       _cachedLastCssFont = cssFont;
     }
@@ -915,7 +922,7 @@ class BitmapCanvas extends EngineCanvas {
     if (shadows != null) {
       ctx.save();
       for (final ui.Shadow shadow in shadows) {
-        ctx.shadowColor = colorToCssString(shadow.color)!;
+        ctx.shadowColor = colorToCssString(shadow.color);
         ctx.shadowBlur = shadow.blurRadius;
         ctx.shadowOffsetX = shadow.offset.dx;
         ctx.shadowOffsetY = shadow.offset.dy;
@@ -1021,7 +1028,7 @@ class BitmapCanvas extends EngineCanvas {
           : convertVertexPositions(mode, vertices.positions);
       // Draw hairline for vertices if no vertex colors are specified.
       save();
-      final ui.Color color = paint.color ?? const ui.Color(0xFF000000);
+      final ui.Color color = ui.Color(paint.color);
       _canvasPool.contextHandle
         ..fillStyle = null
         ..strokeStyle = colorToCssString(color);
@@ -1036,7 +1043,7 @@ class BitmapCanvas extends EngineCanvas {
   /// Stores paint data used by [drawPoints]. We cannot use the original paint
   /// data object because painting style is determined by [ui.PointMode] and
   /// not by [SurfacePointData.style].
-  static SurfacePaintData _drawPointsPaint = SurfacePaintData()
+  static final SurfacePaintData _drawPointsPaint = SurfacePaintData()
     ..strokeCap = ui.StrokeCap.round
     ..strokeJoin = ui.StrokeJoin.round
     ..blendMode = ui.BlendMode.srcOver;
@@ -1049,7 +1056,7 @@ class BitmapCanvas extends EngineCanvas {
     } else {
       _drawPointsPaint.style = ui.PaintingStyle.fill;
     }
-    _drawPointsPaint.color = paint.color ?? const ui.Color(0xFF000000);
+    _drawPointsPaint.color = paint.color;
     _drawPointsPaint.maskFilter = paint.maskFilter;
 
     final double dpr = ui.window.devicePixelRatio;
@@ -1343,7 +1350,7 @@ String? stringForStrokeCap(ui.StrokeCap? strokeCap) {
 }
 
 String stringForStrokeJoin(ui.StrokeJoin strokeJoin) {
-  assert(strokeJoin != null); // ignore: unnecessary_null_comparison
+  assert(strokeJoin != null);
   switch (strokeJoin) {
     case ui.StrokeJoin.round:
       return 'round';

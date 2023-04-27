@@ -10,9 +10,19 @@
 
 namespace impeller {
 
+class AiksContext;
+
 class DlImageImpeller final : public flutter::DlImage {
  public:
-  static sk_sp<DlImageImpeller> Make(std::shared_ptr<Texture> texture);
+  static sk_sp<DlImageImpeller> Make(
+      std::shared_ptr<Texture> texture,
+      OwningContext owning_context = OwningContext::kIO);
+
+  static sk_sp<DlImageImpeller> MakeFromYUVTextures(
+      AiksContext* aiks_context,
+      std::shared_ptr<Texture> y_texture,
+      std::shared_ptr<Texture> uv_texture,
+      YUVColorSpace yuv_color_space);
 
   // |DlImage|
   ~DlImageImpeller() override;
@@ -24,6 +34,9 @@ class DlImageImpeller final : public flutter::DlImage {
   std::shared_ptr<impeller::Texture> impeller_texture() const override;
 
   // |DlImage|
+  bool isOpaque() const override;
+
+  // |DlImage|
   bool isTextureBacked() const override;
 
   // |DlImage|
@@ -32,10 +45,15 @@ class DlImageImpeller final : public flutter::DlImage {
   // |DlImage|
   size_t GetApproximateByteSize() const override;
 
+  // |DlImage|
+  OwningContext owning_context() const override { return owning_context_; }
+
  private:
   std::shared_ptr<Texture> texture_;
+  OwningContext owning_context_;
 
-  explicit DlImageImpeller(std::shared_ptr<Texture> texture);
+  explicit DlImageImpeller(std::shared_ptr<Texture> texture,
+                           OwningContext owning_context = OwningContext::kIO);
 
   FML_DISALLOW_COPY_AND_ASSIGN(DlImageImpeller);
 };

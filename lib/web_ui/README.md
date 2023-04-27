@@ -25,9 +25,10 @@ get help for a specific subcommand, run `felt help SUBCOMMAND`.
 The most useful subcommands are:
 
 - `felt build` - builds a local Flutter Web engine ready to be used by the
-  Flutter framework. To use the local engine build, pass
-  `--local-engine=host_debug_unopt` to the `flutter` command, or to
-  `dev/bots/test.dart` when running a web shard, such as `web_tests`.
+  Flutter framework. To use the local engine build, build with
+  `felt build --host`, then pass `--local-engine=host_debug_unopt` to the
+  `flutter` command, or to `dev/bots/test.dart` when running a web shard, such
+  as `web_tests`.
 - `felt test` - runs web engine tests. By default, this runs all tests using
   Chromium. Passing one or more paths to specific tests would run just the
   specified tests. Run `felt help test` for more options.
@@ -108,27 +109,6 @@ Changing parameters in the browser lock is effective immediately when running
 tests locally. To make changes effective on LUCI follow instructions in
 [Rolling Browsers][#rolling-browsers].
 
-#### Local testing in Safari using the iOS Simulator
-
-1. If you haven't already, install Xcode.
-2. The iOS version and device type used by web engine tests are specified in
-   the [browser_lock.yaml][2] file. Install the iOS Simulator version using:
-   Xcode > Preferences > Components
-3. Run `xcrun simctl list devices`. If the simulator you want is not installed
-   use step 4.
-4. Use felt to create a simulator:
-
-```
-felt create_simulator
-```
-
-To run tests on ios-safari use the one of the following commands:
-
-```
-felt test --browser=ios-safari
-felt test --browser=ios-safari test/alarm_clock_test.dart
-```
-
 ### Rolling browsers
 
 When running tests on LUCI using Chromium, LUCI uses the version of Chromium
@@ -167,6 +147,26 @@ is needed, follow these steps to roll the new version:
 If you have questions, contact the Flutter Web team on Flutter Discord on the
 \#hackers-web-🌍 channel.
 
+#### Firefox
+
+We test with Firefox on LUCI in the Linux Web Engine builder. The process for
+rolling Firefox is even easier than Chromium. Simply update `browser_lock.yaml`
+with the latest version of Firefox, and run `browser_roller.dart`.
+
+#### .ci.yaml
+
+After rolling Chrome and/or Firefox, also update the CI dependencies in
+`.ci.yaml` to make use of the new versions. The lines look like
+
+```yaml
+      dependencies: >-
+        [
+          {"dependency": "chrome_and_driver", "version": "version:107.0"},
+          {"dependency": "firefox", "version": "version:83.0"},
+          {"dependency": "goldctl", "version": "git_revision:3a77d0b12c697a840ca0c7705208e8622dc94603"}
+        ]
+```
+
 ##### **browser_roller.dart**
 
 The script has the following command-line options:
@@ -184,7 +184,7 @@ The script has the following command-line options:
 
 In general, the manual process goes like this:
 
-1. Dowload the binaries for the new browser/driver for each operaing system
+1. Dowload the binaries for the new browser/driver for each operating system
    (macOS, linux, windows).
 2. Create CIPD packages for these packages (more documentation is available for
    Googlers at go/cipd-flutter-web)
@@ -225,6 +225,19 @@ directly), follow these steps to roll to the new version:
 
 If you have questions, contact the Flutter Web team on Flutter Discord on the
 #hackers-web-🌍 channel.
+
+### Rolling Noto Font Data
+
+In order to generate new data for the Noto fallback fonts, you will need
+a GoogleFonts API key. Once you have one, run:
+
+```
+./dev/felt generate-fallback-font-data --key=<your GoogleFonts API key>
+```
+
+This will generate the file `lib/src/engine/canvaskit/font_fallback_data.dart` with
+the latest data from GoogleFonts. This generated file should then be rolled in with
+a PR to the engine.
 
 ### Configuration files
 
@@ -326,3 +339,7 @@ Once you know the version for the Emscripten SDK, change the line in
 [4]: https://chrome-infra-packages.appspot.com/p/flutter_internal
 [5]: https://cs.opensource.google/flutter/recipes/+/master:recipes/engine/web_engine.py
 [6]: https://chromium.googlesource.com/chromium/src.git/+/main/docs/cipd_and_3pp.md#What-is-CIPD
+
+## Unicode properties
+
+We pull the unicode properties we need from `third_party/web_unicode`. See `third_party/web_unicode/README.md` for more details on how we generate Dart code from unicode properties.

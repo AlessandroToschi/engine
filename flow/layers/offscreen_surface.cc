@@ -4,6 +4,7 @@
 
 #include "flutter/flow/layers/offscreen_surface.h"
 
+#include "fml/build_config.h"
 #include "third_party/skia/include/core/SkImageEncoder.h"
 #include "third_party/skia/include/core/SkPictureRecorder.h"
 #include "third_party/skia/include/core/SkSerialProcs.h"
@@ -33,7 +34,7 @@ static sk_sp<SkSurface> CreateSnapshotSurface(GrDirectContext* surface_context,
 /// Returns a buffer containing a snapshot of the surface.
 ///
 /// If compressed is true the data is encoded as PNG.
-static sk_sp<SkData> GetRasterData(sk_sp<SkSurface> offscreen_surface,
+static sk_sp<SkData> GetRasterData(const sk_sp<SkSurface>& offscreen_surface,
                                    bool compressed) {
   // Prepare an image from the surface, this image may potentially be on th GPU.
   auto potentially_gpu_snapshot = offscreen_surface->makeImageSnapshot();
@@ -68,6 +69,7 @@ static sk_sp<SkData> GetRasterData(sk_sp<SkSurface> offscreen_surface,
 OffscreenSurface::OffscreenSurface(GrDirectContext* surface_context,
                                    const SkISize& size) {
   offscreen_surface_ = CreateSnapshotSurface(surface_context, size);
+  size_ = size;
 }
 
 sk_sp<SkData> OffscreenSurface::GetRasterData(bool compressed) const {

@@ -31,14 +31,18 @@ class Texture {
 
   virtual ISize GetSize() const = 0;
 
+  size_t GetMipCount() const;
+
   const TextureDescriptor& GetTextureDescriptor() const;
+
+  void SetIntent(TextureIntent intent);
 
   TextureIntent GetIntent() const;
 
   virtual Scalar GetYCoordScale() const;
 
  protected:
-  Texture(TextureDescriptor desc);
+  explicit Texture(TextureDescriptor desc);
 
   [[nodiscard]] virtual bool OnSetContents(const uint8_t* contents,
                                            size_t length,

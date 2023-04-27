@@ -12,7 +12,7 @@
 @protocol FlutterResizeSynchronizerDelegate
 
 /**
- * Invoked on raster thread; Delegate should flush the OpenGL context.
+ * Invoked on raster thread; Delegate should flush the graphics context.
  */
 - (void)resizeSynchronizerFlush:(nonnull FlutterResizeSynchronizer*)synchronizer;
 
@@ -74,6 +74,13 @@
  * method is called (on platform thread).
  */
 - (void)requestCommit;
+
+/**
+ * Called from view to notify the synchronizer that there are no Flutter frames
+ * coming. Synchronizer must unblock main thread and not block until another
+ * frame is available.
+ */
+- (void)noFlutterContent;
 
 /**
  * Called when shutting down. Unblocks everything and prevents any further synchronization.

@@ -13,6 +13,7 @@
 #include "impeller/renderer/pipeline_descriptor.h"
 #include "impeller/renderer/pipeline_library.h"
 #include "impeller/renderer/shader_library.h"
+#include "impeller/renderer/shader_types.h"
 #include "impeller/runtime_stage/runtime_stage.h"
 #include "impeller/runtime_stage/runtime_stage_playground.h"
 
@@ -29,7 +30,7 @@ TEST(RuntimeStageTest, CanReadValidBlob) {
   ASSERT_GT(fixture->GetSize(), 0u);
   RuntimeStage stage(std::move(fixture));
   ASSERT_TRUE(stage.IsValid());
-  ASSERT_EQ(stage.GetShaderStage(), ShaderStage::kFragment);
+  ASSERT_EQ(stage.GetShaderStage(), RuntimeShaderStage::kFragment);
 }
 
 TEST(RuntimeStageTest, CanRejectInvalidBlob) {
@@ -42,7 +43,7 @@ TEST(RuntimeStageTest, CanRejectInvalidBlob) {
   // Not meant to be secure. Just reject obviously bad blobs using magic
   // numbers.
   ::memset(junk_allocation->GetBuffer(), 127, junk_allocation->GetLength());
-  RuntimeStage stage(CreateMappingFromAllocation(std::move(junk_allocation)));
+  RuntimeStage stage(CreateMappingFromAllocation(junk_allocation));
   ASSERT_FALSE(stage.IsValid());
 }
 
@@ -186,7 +187,7 @@ TEST(RuntimeStageTest, CanReadUniforms) {
 }
 
 TEST_P(RuntimeStageTest, CanRegisterStage) {
-  if (GetBackend() != PlaygroundBackend::kMetal) {
+  if (GetParam() != PlaygroundBackend::kMetal) {
     GTEST_SKIP_("Skipped: https://github.com/flutter/flutter/issues/105538");
   }
   auto fixture =
@@ -199,23 +200,34 @@ TEST_P(RuntimeStageTest, CanRegisterStage) {
   auto future = registration.get_future();
   auto library = GetContext()->GetShaderLibrary();
   library->RegisterFunction(
-      stage.GetEntrypoint(),   //
-      stage.GetShaderStage(),  //
-      stage.GetCodeMapping(),  //
+      stage.GetEntrypoint(),                  //
+      ToShaderStage(stage.GetShaderStage()),  //
+      stage.GetCodeMapping(),                 //
       fml::MakeCopyable([reg = std::move(registration)](bool result) mutable {
         reg.set_value(result);
       }));
   ASSERT_TRUE(future.get());
-  auto function =
-      library->GetFunction(stage.GetEntrypoint(), ShaderStage::kFragment);
-  ASSERT_NE(function, nullptr);
+  {
+    auto function =
+        library->GetFunction(stage.GetEntrypoint(), ShaderStage::kFragment);
+    ASSERT_NE(function, nullptr);
+  }
+
+  // Check if unregistering works.
+
+  library->UnregisterFunction(stage.GetEntrypoint(), ShaderStage::kFragment);
+  {
+    auto function =
+        library->GetFunction(stage.GetEntrypoint(), ShaderStage::kFragment);
+    ASSERT_EQ(function, nullptr);
+  }
 }
 
 TEST_P(RuntimeStageTest, CanCreatePipelineFromRuntimeStage) {
-  if (GetBackend() != PlaygroundBackend::kMetal) {
+  if (GetParam() != PlaygroundBackend::kMetal) {
     GTEST_SKIP_("Skipped: https://github.com/flutter/flutter/issues/105538");
   }
-  auto stage = CreateStageFromFixture("ink_sparkle.frag.iplr");
+  auto stage = OpenAssetAsRuntimeStage("ink_sparkle.frag.iplr");
   ASSERT_NE(stage, nullptr);
   ASSERT_TRUE(RegisterStage(*stage));
   auto library = GetContext()->GetShaderLibrary();
@@ -236,10 +248,7 @@ TEST_P(RuntimeStageTest, CanCreatePipelineFromRuntimeStage) {
   desc.SetColorAttachmentDescriptor(0u, color0);
   desc.SetStencilAttachmentDescriptors(stencil0);
   desc.SetStencilPixelFormat(PixelFormat::kDefaultStencil);
-  auto pipeline = GetContext()
-                      ->GetPipelineLibrary()
-                      ->GetRenderPipeline(std::move(desc))
-                      .get();
+  auto pipeline = GetContext()->GetPipelineLibrary()->GetPipeline(desc).Get();
   ASSERT_NE(pipeline, nullptr);
 }
 

@@ -25,8 +25,11 @@ class OffscreenSurface {
 
   bool IsValid() const;
 
+  SkISize size() const { return size_; }
+
  private:
   sk_sp<SkSurface> offscreen_surface_;
+  SkISize size_;
 
   FML_DISALLOW_COPY_AND_ASSIGN(OffscreenSurface);
 };

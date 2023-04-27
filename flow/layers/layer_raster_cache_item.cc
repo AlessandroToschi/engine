@@ -5,6 +5,7 @@
 #include "flutter/flow/layers/layer_raster_cache_item.h"
 #include "flutter/flow/layers/container_layer.h"
 #include "flutter/flow/raster_cache_item.h"
+#include "flutter/flow/raster_cache_util.h"
 
 namespace flutter {
 
@@ -46,14 +47,14 @@ void LayerRasterCacheItem::PrerollFinalize(PrerollContext* context,
   // alive, but if the following conditions apply then we need to set our
   // state back to kDoNotCache so that we don't populate the entry later.
   if (context->has_platform_view || context->has_texture_layer ||
-      !SkRect::Intersects(context->cull_rect, layer_->paint_bounds())) {
+      context->state_stack.content_culled(layer_->paint_bounds())) {
     return;
   }
   child_items_ = context->raster_cached_entries->size() - child_items_;
   if (num_cache_attempts_ >= layer_cached_threshold_) {
     // the layer can be cached
     cache_state_ = CacheState::kCurrent;
-    context->raster_cache->MarkSeen(key_id_, matrix_);
+    context->raster_cache->MarkSeen(key_id_, matrix_, true);
   } else {
     num_cache_attempts_++;
     // access current layer
@@ -67,7 +68,8 @@ void LayerRasterCacheItem::PrerollFinalize(PrerollContext* context,
                                    RasterCacheKeyType::kLayerChildren);
       }
       cache_state_ = CacheState::kChildren;
-      context->raster_cache->MarkSeen(layer_children_id_.value(), matrix_);
+      context->raster_cache->MarkSeen(layer_children_id_.value(), matrix_,
+                                      true);
     }
   }
 }
@@ -101,23 +103,22 @@ bool Rasterize(RasterCacheItem::CacheState cache_state,
                const PaintContext& paint_context,
                SkCanvas* canvas) {
   FML_DCHECK(cache_state != RasterCacheItem::CacheState::kNone);
-  SkISize canvas_size = canvas->getBaseLayerSize();
-  SkNWayCanvas internal_nodes_canvas(canvas_size.width(), canvas_size.height());
-  internal_nodes_canvas.setMatrix(canvas->getTotalMatrix());
-  internal_nodes_canvas.addCanvas(canvas);
+  LayerStateStack state_stack;
+  state_stack.set_delegate(canvas);
+  state_stack.set_checkerboard_func(
+      paint_context.state_stack.checkerboard_func());
   PaintContext context = {
       // clang-format off
-          .internal_nodes_canvas         = static_cast<SkCanvas*>(&internal_nodes_canvas),
-          .leaf_nodes_canvas             = canvas,
-          .gr_context                    = paint_context.gr_context,
-          .dst_color_space               = paint_context.dst_color_space,
-          .view_embedder                 = paint_context.view_embedder,
-          .raster_time                   = paint_context.raster_time,
-          .ui_time                       = paint_context.ui_time,
-          .texture_registry              = paint_context.texture_registry,
-          .raster_cache                  = paint_context.raster_cache,
-          .checkerboard_offscreen_layers = paint_context.checkerboard_offscreen_layers,
-          .frame_device_pixel_ratio      = paint_context.frame_device_pixel_ratio,
+      .state_stack                   = state_stack,
+      .canvas                        = canvas,
+      .gr_context                    = paint_context.gr_context,
+      .dst_color_space               = paint_context.dst_color_space,
+      .view_embedder                 = paint_context.view_embedder,
+      .raster_time                   = paint_context.raster_time,
+      .ui_time                       = paint_context.ui_time,
+      .texture_registry              = paint_context.texture_registry,
+      .raster_cache                  = paint_context.raster_cache,
+      .frame_device_pixel_ratio      = paint_context.frame_device_pixel_ratio,
       // clang-format on
   };
 
@@ -147,12 +148,11 @@ bool LayerRasterCacheItem::TryToPrepareRasterCache(const PaintContext& context,
     if (const SkRect* paint_bounds = GetPaintBoundsFromLayer()) {
       RasterCache::Context r_context = {
           // clang-format off
-      .gr_context         = context.gr_context,
-      .dst_color_space    = context.dst_color_space,
-      .matrix             = matrix_,
-      .logical_rect       = *paint_bounds,
-      .flow_type          = flow_type,
-      .checkerboard       = context.checkerboard_offscreen_layers,
+          .gr_context         = context.gr_context,
+          .dst_color_space    = context.dst_color_space,
+          .matrix             = matrix_,
+          .logical_rect       = *paint_bounds,
+          .flow_type          = flow_type,
           // clang-format on
       };
       return context.raster_cache->UpdateCacheEntry(
@@ -168,7 +168,7 @@ bool LayerRasterCacheItem::TryToPrepareRasterCache(const PaintContext& context,
 
 bool LayerRasterCacheItem::Draw(const PaintContext& context,
                                 const SkPaint* paint) const {
-  return Draw(context, context.leaf_nodes_canvas, paint);
+  return Draw(context, context.canvas, paint);
 }
 
 bool LayerRasterCacheItem::Draw(const PaintContext& context,

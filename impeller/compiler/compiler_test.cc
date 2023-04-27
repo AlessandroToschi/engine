@@ -58,20 +58,31 @@ static std::string SLFileName(const char* fixture_name,
   return stream.str();
 }
 
+std::unique_ptr<fml::FileMapping> CompilerTest::GetReflectionJson(
+    const char* fixture_name) const {
+  auto filename = ReflectionJSONName(fixture_name);
+  auto fd = fml::OpenFileReadOnly(intermediates_directory_, filename.c_str());
+  return fml::FileMapping::CreateReadOnly(fd);
+}
+
 bool CompilerTest::CanCompileAndReflect(const char* fixture_name,
-                                        SourceType source_type) const {
+                                        SourceType source_type,
+                                        SourceLanguage source_language,
+                                        const char* entry_point_name) const {
   auto fixture = flutter::testing::OpenFixtureAsMapping(fixture_name);
-  if (!fixture->GetMapping()) {
+  if (!fixture || !fixture->GetMapping()) {
     VALIDATION_LOG << "Could not find shader in fixtures: " << fixture_name;
     return false;
   }
 
   SourceOptions source_options(fixture_name, source_type);
   source_options.target_platform = GetParam();
+  source_options.source_language = source_language;
   source_options.working_directory = std::make_shared<fml::UniqueFD>(
       flutter::testing::OpenFixturesDirectory());
   source_options.entry_point_name = EntryPointFunctionNameFromSourceName(
-      fixture_name, SourceTypeFromFileName(fixture_name));
+      fixture_name, SourceTypeFromFileName(fixture_name), source_language,
+      entry_point_name);
 
   Reflector::Options reflector_options;
   reflector_options.header_file_name = ReflectionHeaderName(fixture_name);
@@ -159,7 +170,6 @@ bool CompilerTest::CanCompileAndReflect(const char* fixture_name,
       return false;
     }
   }
-
   return true;
 }
 

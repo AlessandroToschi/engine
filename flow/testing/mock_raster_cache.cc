@@ -24,8 +24,10 @@ void MockRasterCache::AddMockLayer(int width, int height) {
   SkMatrix ctm = SkMatrix::I();
   SkPath path;
   path.addRect(100, 100, 100 + width, 100 + height);
-  MockCacheableLayer layer = MockCacheableLayer(path);
-  layer.Preroll(&preroll_context_, ctm);
+  int layer_cached_threshold = 1;
+  MockCacheableLayer layer =
+      MockCacheableLayer(path, SkPaint(), layer_cached_threshold);
+  layer.Preroll(&preroll_context_);
   layer.raster_cache_item()->TryToPrepareRasterCache(paint_context_);
   RasterCache::Context r_context = {
       // clang-format off
@@ -33,7 +35,6 @@ void MockRasterCache::AddMockLayer(int width, int height) {
       .dst_color_space    = preroll_context_.dst_color_space,
       .matrix             = ctm,
       .logical_rect       = layer.paint_bounds(),
-      .checkerboard       = preroll_context_.checkerboard_offscreen_layers,
       // clang-format on
   };
   UpdateCacheEntry(
@@ -55,23 +56,24 @@ void MockRasterCache::AddMockPicture(int width, int height) {
   recorder.drawPath(path, SkPaint());
   sk_sp<DisplayList> display_list = recorder.Build();
 
-  PaintContextHolder holder = GetSamplePaintContextHolder(this);
+  FixedRefreshRateStopwatch raster_time;
+  FixedRefreshRateStopwatch ui_time;
+  LayerStateStack state_stack;
+  PaintContextHolder holder =
+      GetSamplePaintContextHolder(state_stack, this, &raster_time, &ui_time);
   holder.paint_context.dst_color_space = color_space_;
 
   DisplayListRasterCacheItem display_list_item(display_list.get(), SkPoint(),
                                                true, false);
-  for (int i = 0; i < access_threshold(); i++) {
-    MarkSeen(display_list_item.GetId().value(), ctm);
-    Draw(display_list_item.GetId().value(), mock_canvas_, nullptr);
+  for (size_t i = 0; i < access_threshold(); i++) {
+    AutoCache(&display_list_item, &preroll_context_, ctm);
   }
-  MarkSeen(display_list_item.GetId().value(), ctm);
   RasterCache::Context r_context = {
       // clang-format off
       .gr_context         = preroll_context_.gr_context,
       .dst_color_space    = preroll_context_.dst_color_space,
       .matrix             = ctm,
       .logical_rect       = display_list->bounds(),
-      .checkerboard       = preroll_context_.checkerboard_offscreen_layers,
       // clang-format on
   };
   UpdateCacheEntry(RasterCacheKeyID(display_list->unique_id(),
@@ -83,32 +85,29 @@ void MockRasterCache::AddMockPicture(int width, int height) {
                    });
 }
 
-static std::vector<RasterCacheItem*> raster_cache_items_;
-PrerollContextHolder GetSamplePrerollContextHolder(RasterCache* raster_cache) {
-  FixedRefreshRateStopwatch raster_time;
-  FixedRefreshRateStopwatch ui_time;
-  MutatorsStack mutators_stack;
-  TextureRegistry texture_registry;
+PrerollContextHolder GetSamplePrerollContextHolder(
+    LayerStateStack& state_stack,
+    RasterCache* raster_cache,
+    FixedRefreshRateStopwatch* raster_time,
+    FixedRefreshRateStopwatch* ui_time) {
   sk_sp<SkColorSpace> srgb = SkColorSpace::MakeSRGB();
 
   PrerollContextHolder holder = {
       {
           // clang-format off
           .raster_cache                  = raster_cache,
-          .gr_context                    =  nullptr,
-          .view_embedder                 =  nullptr,
-          .mutators_stack                = mutators_stack,
-          .dst_color_space               =  srgb.get(),
-          .cull_rect                     =  kGiantRect,
+          .gr_context                    = nullptr,
+          .view_embedder                 = nullptr,
+          .state_stack                   = state_stack,
+          .dst_color_space               = srgb.get(),
           .surface_needs_readback        = false,
-          .raster_time                   = raster_time,
-          .ui_time                       = ui_time,
-          .texture_registry              = texture_registry,
-          .checkerboard_offscreen_layers =  false,
-          .frame_device_pixel_ratio      =  1.0f,
-          .has_platform_view             =  false,
+          .raster_time                   = *raster_time,
+          .ui_time                       = *ui_time,
+          .texture_registry              = nullptr,
+          .frame_device_pixel_ratio      = 1.0f,
+          .has_platform_view             = false,
           .has_texture_layer             = false,
-          .raster_cached_entries         =  &raster_cache_items_,
+          .raster_cached_entries         = &raster_cache_items_,
           // clang-format on
       },
       srgb};
@@ -116,26 +115,24 @@ PrerollContextHolder GetSamplePrerollContextHolder(RasterCache* raster_cache) {
   return holder;
 }
 
-PaintContextHolder GetSamplePaintContextHolder(RasterCache* raster_cache) {
-  FixedRefreshRateStopwatch raster_time;
-  FixedRefreshRateStopwatch ui_time;
-  MutatorsStack mutators_stack;
-  TextureRegistry texture_registry;
+PaintContextHolder GetSamplePaintContextHolder(
+    LayerStateStack& state_stack,
+    RasterCache* raster_cache,
+    FixedRefreshRateStopwatch* raster_time,
+    FixedRefreshRateStopwatch* ui_time) {
   sk_sp<SkColorSpace> srgb = SkColorSpace::MakeSRGB();
   PaintContextHolder holder = {// clang-format off
     {
-          .internal_nodes_canvas         = nullptr,
-          .leaf_nodes_canvas             = nullptr,
-          .gr_context                    = nullptr,
-          .dst_color_space               = srgb.get(),
-          .view_embedder                 = nullptr,
-          .raster_time                   = raster_time,
-          .ui_time                       = ui_time,
-          .texture_registry              = texture_registry,
-          .raster_cache                  = raster_cache,
-          .checkerboard_offscreen_layers = false,
-          .frame_device_pixel_ratio      = 1.0f,
-          .inherited_opacity             = SK_Scalar1,
+        .state_stack                   = state_stack,
+        .canvas                        = nullptr,
+        .gr_context                    = nullptr,
+        .dst_color_space               = srgb.get(),
+        .view_embedder                 = nullptr,
+        .raster_time                   = *raster_time,
+        .ui_time                       = *ui_time,
+        .texture_registry              = nullptr,
+        .raster_cache                  = raster_cache,
+        .frame_device_pixel_ratio      = 1.0f,
     },
                                // clang-format on
                                srgb};
@@ -143,13 +140,26 @@ PaintContextHolder GetSamplePaintContextHolder(RasterCache* raster_cache) {
   return holder;
 }
 
-bool DisplayListRasterCacheItemTryToRasterCache(
+bool RasterCacheItemPrerollAndTryToRasterCache(
     DisplayListRasterCacheItem& display_list_item,
     PrerollContext& context,
     PaintContext& paint_context,
     const SkMatrix& matrix) {
+  RasterCacheItemPreroll(display_list_item, context, matrix);
+  context.raster_cache->EvictUnusedCacheEntries();
+  return RasterCacheItemTryToRasterCache(display_list_item, paint_context);
+}
+
+void RasterCacheItemPreroll(DisplayListRasterCacheItem& display_list_item,
+                            PrerollContext& context,
+                            const SkMatrix& matrix) {
   display_list_item.PrerollSetup(&context, matrix);
   display_list_item.PrerollFinalize(&context, matrix);
+}
+
+bool RasterCacheItemTryToRasterCache(
+    DisplayListRasterCacheItem& display_list_item,
+    PaintContext& paint_context) {
   if (display_list_item.cache_state() ==
       RasterCacheItem::CacheState::kCurrent) {
     return display_list_item.TryToPrepareRasterCache(paint_context);

@@ -13,12 +13,18 @@ import 'path.dart';
 import 'picture.dart';
 
 class LayerScene implements ui.Scene {
-  final LayerTree layerTree;
-
   LayerScene(RootLayer rootLayer) : layerTree = LayerTree(rootLayer);
+
+  final LayerTree layerTree;
 
   @override
   void dispose() {}
+
+  @override
+  Future<void> renderToSurface(ui.RenderSurface renderSurface, {bool flipVertical = false}) async {
+     final ui.Picture picture = layerTree.flatten();
+     await picture.renderToSurface(renderSurface, flipVertical: flipVertical);
+  }
 
   @override
   Future<ui.Image> toImage(int width, int height) {
@@ -27,9 +33,15 @@ class LayerScene implements ui.Scene {
   }
 
   @override
-  ui.Image toGpuImage(int width, int height) {
+  Future<Object?> toCanvas(int width, int height) {
     final ui.Picture picture = layerTree.flatten();
-    return picture.toGpuImage(width, height);
+    return picture.toCanvas(width, height);
+  }
+
+  @override
+  ui.Image toImageSync(int width, int height) {
+    final ui.Picture picture = layerTree.flatten();
+    return picture.toImageSync(width, height);
   }
 }
 
@@ -147,7 +159,7 @@ class LayerSceneBuilder implements ui.SceneBuilder {
     ui.ColorFilter filter, {
     ui.ColorFilterEngineLayer? oldLayer,
   }) {
-    assert(filter != null); // ignore: unnecessary_null_comparison
+    assert(filter != null);
     return pushLayer<ColorFilterEngineLayer>(ColorFilterEngineLayer(filter));
   }
 
@@ -155,9 +167,10 @@ class LayerSceneBuilder implements ui.SceneBuilder {
   ImageFilterEngineLayer pushImageFilter(
     ui.ImageFilter filter, {
     ui.ImageFilterEngineLayer? oldLayer,
+    ui.Offset offset = ui.Offset.zero,
   }) {
-    assert(filter != null); // ignore: unnecessary_null_comparison
-    return pushLayer<ImageFilterEngineLayer>(ImageFilterEngineLayer(filter));
+    assert(filter != null);
+    return pushLayer<ImageFilterEngineLayer>(ImageFilterEngineLayer(filter, offset));
   }
 
   @override
@@ -176,6 +189,17 @@ class LayerSceneBuilder implements ui.SceneBuilder {
     ui.Offset offset = ui.Offset.zero,
   }) {
     return pushLayer<OpacityEngineLayer>(OpacityEngineLayer(alpha, offset));
+  }
+
+  @override
+  BlendEngineLayer pushBlend(
+    int alpha,
+    ui.BlendMode blendMode, {
+    ui.Offset offset = ui.Offset.zero,
+    ui.EngineLayer? oldLayer,
+  }) {
+    // throw UnimplementedError('not implemented');
+    return pushLayer<BlendEngineLayer>(BlendEngineLayer(alpha, blendMode, offset));
   }
 
   @override

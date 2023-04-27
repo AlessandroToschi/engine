@@ -18,11 +18,13 @@
 #include "impeller/base/comparable.h"
 #include "impeller/renderer/formats.h"
 #include "impeller/renderer/shader_types.h"
+#include "impeller/tessellator/tessellator.h"
 
 namespace impeller {
 
 class ShaderFunction;
 class VertexDescriptor;
+template <typename T>
 class Pipeline;
 
 class PipelineDescriptor final : public Comparable<PipelineDescriptor> {
@@ -105,9 +107,23 @@ class PipelineDescriptor final : public Comparable<PipelineDescriptor> {
 
   void ResetAttachments();
 
+  void SetCullMode(CullMode mode);
+
+  CullMode GetCullMode() const;
+
+  void SetWindingOrder(WindingOrder order);
+
+  WindingOrder GetWindingOrder() const;
+
+  void SetPrimitiveType(PrimitiveType type);
+
+  PrimitiveType GetPrimitiveType() const;
+
  private:
   std::string label_;
   SampleCount sample_count_ = SampleCount::kCount1;
+  WindingOrder winding_order_ = WindingOrder::kClockwise;
+  CullMode cull_mode_ = CullMode::kNone;
   std::map<ShaderStage, std::shared_ptr<const ShaderFunction>> entrypoints_;
   std::map<size_t /* index */, ColorAttachmentDescriptor>
       color_attachment_descriptors_;
@@ -119,12 +135,7 @@ class PipelineDescriptor final : public Comparable<PipelineDescriptor> {
       front_stencil_attachment_descriptor_;
   std::optional<StencilAttachmentDescriptor>
       back_stencil_attachment_descriptor_;
+  PrimitiveType primitive_type_ = PrimitiveType::kTriangle;
 };
-
-using PipelineMap =
-    std::unordered_map<PipelineDescriptor,
-                       std::shared_future<std::shared_ptr<Pipeline>>,
-                       ComparableHash<PipelineDescriptor>,
-                       ComparableEqual<PipelineDescriptor>>;
 
 }  // namespace impeller

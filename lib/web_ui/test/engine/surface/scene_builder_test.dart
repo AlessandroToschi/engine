@@ -35,7 +35,7 @@ void testMain() {
     test('pushTransform implements surface lifecycle', () {
       testLayerLifeCycle((ui.SceneBuilder sceneBuilder, ui.EngineLayer? oldLayer) {
         return sceneBuilder.pushTransform(
-            (Matrix4.identity()..scale(domWindow.devicePixelRatio as double)).toFloat64());
+            (Matrix4.identity()..scale(domWindow.devicePixelRatio)).toFloat64());
       }, () {
         return '''<s><flt-transform></flt-transform></s>''';
       });
@@ -519,7 +519,7 @@ void testMain() {
           scene.webOnlyRootElement!.querySelectorAll('flt-paragraph').toList();
       expect(pTags, hasLength(string.length));
       expect(
-        scene.webOnlyRootElement!.querySelectorAll('flt-paragraph').map((DomElement p) => p.innerText).join(''),
+        scene.webOnlyRootElement!.querySelectorAll('flt-paragraph').map((DomElement p) => p.innerText).join(),
         string,
       );
       renderedLayers.removeWhere((String key, ui.EngineLayer value) => !string.contains(key));
@@ -595,8 +595,8 @@ void testMain() {
 
     final DomElement content = builder.build().webOnlyRootElement!;
     final DomCanvasElement canvas = content.querySelector('canvas')! as DomCanvasElement;
-    final int unscaledWidth = canvas.width!;
-    final int unscaledHeight = canvas.height!;
+    final int unscaledWidth = canvas.width!.toInt();
+    final int unscaledHeight = canvas.height!.toInt();
 
     // Force update to scene which will utilize reuse code path.
     final SurfaceSceneBuilder builder2 = SurfaceSceneBuilder();
@@ -627,8 +627,8 @@ void testMain() {
 
     final DomElement content = builder.build().webOnlyRootElement!;
     final DomCanvasElement canvas = content.querySelector('canvas')! as DomCanvasElement;
-    final int unscaledWidth = canvas.width!;
-    final int unscaledHeight = canvas.height!;
+    final int unscaledWidth = canvas.width!.toInt();
+    final int unscaledHeight = canvas.height!.toInt();
 
     // Force update to scene which will utilize reuse code path.
     final SurfaceSceneBuilder builder2 = SurfaceSceneBuilder();
@@ -895,7 +895,7 @@ EnginePicture _drawPathImagePath() {
       SurfacePaint()
         ..style = ui.PaintingStyle.fill
         ..color = const ui.Color.fromRGBO(0, 255, 0, 1));
-  canvas.drawImage(createTestImage(), const ui.Offset(0, 0), SurfacePaint());
+  canvas.drawImage(createTestImage(), ui.Offset.zero, SurfacePaint());
   canvas.drawCircle(
       const ui.Offset(offsetX + 10, offsetY + 10), 10,
       SurfacePaint()

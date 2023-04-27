@@ -46,7 +46,7 @@ class AndroidSurfaceGLImpeller::ReactorWorker final
 };
 
 static std::shared_ptr<impeller::Context> CreateImpellerContext(
-    std::shared_ptr<impeller::ReactorGLES::Worker> worker) {
+    const std::shared_ptr<impeller::ReactorGLES::Worker>& worker) {
   auto proc_table = std::make_unique<impeller::ProcTableGLES>(
       impeller::egl::CreateProcAddressResolver());
 
@@ -68,7 +68,7 @@ static std::shared_ptr<impeller::Context> CreateImpellerContext(
     return nullptr;
   }
 
-  if (!context->AddReactorWorker(std::move(worker)).has_value()) {
+  if (!context->AddReactorWorker(worker).has_value()) {
     FML_LOG(ERROR) << "Could not add reactor worker.";
     return nullptr;
   }
@@ -78,7 +78,7 @@ static std::shared_ptr<impeller::Context> CreateImpellerContext(
 
 AndroidSurfaceGLImpeller::AndroidSurfaceGLImpeller(
     const std::shared_ptr<AndroidContext>& android_context,
-    std::shared_ptr<PlatformViewAndroidJNI> jni_facade)
+    const std::shared_ptr<PlatformViewAndroidJNI>& jni_facade)
     : AndroidSurface(android_context),
       reactor_worker_(std::shared_ptr<ReactorWorker>(new ReactorWorker())) {
   auto display = std::make_unique<impeller::egl::Display>();
@@ -295,9 +295,11 @@ bool AndroidSurfaceGLImpeller::GLContextPresent(
 }
 
 // |GPUSurfaceGLDelegate|
-intptr_t AndroidSurfaceGLImpeller::GLContextFBO(GLFrameInfo frame_info) const {
+GLFBOInfo AndroidSurfaceGLImpeller::GLContextFBO(GLFrameInfo frame_info) const {
   // FBO0 is the default window bound framebuffer in EGL environments.
-  return 0;
+  return GLFBOInfo{
+      .fbo_id = 0,
+  };
 }
 
 // |GPUSurfaceGLDelegate|

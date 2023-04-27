@@ -21,6 +21,37 @@ namespace impeller {
 class Texture;
 
 //------------------------------------------------------------------------------
+/// @brief      Specified where the allocation resides and how it is used.
+///
+enum class StorageMode {
+  //----------------------------------------------------------------------------
+  /// Allocations can be mapped onto the hosts address space and also be used by
+  /// the device.
+  ///
+  kHostVisible,
+  //----------------------------------------------------------------------------
+  /// Allocations can only be used by the device. This location is optimal for
+  /// use by the device. If the host needs to access these allocations, the
+  /// transfer queue must be used to transfer this allocation onto the a host
+  /// visible buffer.
+  ///
+  kDevicePrivate,
+  //----------------------------------------------------------------------------
+  /// Used by the device for temporary render targets. These allocations cannot
+  /// be transferred from and to other allocations using the transfer queue.
+  /// Render pass cannot initialize the contents of these buffers using load and
+  /// store actions.
+  ///
+  /// These allocations reside in tile memory which has higher bandwidth, lower
+  /// latency and lower power consumption. The total device memory usage is
+  /// also lower as a separate allocation does not need to be created in
+  /// device memory. Prefer using these allocations for intermediates like depth
+  /// and stencil buffers.
+  ///
+  kDeviceTransient,
+};
+
+//------------------------------------------------------------------------------
 /// @brief      The Pixel formats supported by Impeller. The naming convention
 ///             denotes the usage of the component, the bit width of that
 ///             component, and then one or more qualifiers to its
@@ -50,6 +81,8 @@ class Texture;
 enum class PixelFormat {
   kUnknown,
   kA8UNormInt,
+  kR8UNormInt,
+  kR8G8UNormInt,
   kR8G8B8A8UNormInt,
   kR8G8B8A8UNormIntSRGB,
   kB8G8R8A8UNormInt,
@@ -99,6 +132,7 @@ enum class StoreAction {
   kDontCare,
   kStore,
   kMultisampleResolve,
+  kStoreAndMultisampleResolve,
 };
 
 constexpr bool CanClearAttachment(LoadAction action) {
@@ -115,6 +149,7 @@ constexpr bool CanClearAttachment(LoadAction action) {
 constexpr bool CanDiscardAttachmentWhenDone(StoreAction action) {
   switch (action) {
     case StoreAction::kStore:
+    case StoreAction::kStoreAndMultisampleResolve:
       return false;
     case StoreAction::kDontCare:
     case StoreAction::kMultisampleResolve:
@@ -184,11 +219,19 @@ enum class PrimitiveType {
 struct DepthRange {
   Scalar z_near = 0.0;
   Scalar z_far = 1.0;
+
+  constexpr bool operator==(const DepthRange& other) const {
+    return z_near == other.z_near && z_far == other.z_far;
+  }
 };
 
 struct Viewport {
   Rect rect;
   DepthRange depth_range;
+
+  constexpr bool operator==(const Viewport& other) const {
+    return rect == other.rect && depth_range == other.depth_range;
+  }
 };
 
 enum class MinMagFilter {
@@ -196,6 +239,16 @@ enum class MinMagFilter {
   kNearest,
   /// Select two points and linearly interpolate between them. Some formats
   /// may not support this.
+  kLinear,
+};
+
+enum class MipFilter {
+  /// Always sample from mip level 0. Other mip levels are ignored.
+  kNone,
+  /// Sample from the nearest mip level.
+  kNearest,
+  /// Sample from the two nearest mip levels and linearly interpolate between
+  /// them.
   kLinear,
 };
 
@@ -222,8 +275,11 @@ constexpr size_t BytesPerPixelForPixelFormat(PixelFormat format) {
     case PixelFormat::kUnknown:
       return 0u;
     case PixelFormat::kA8UNormInt:
+    case PixelFormat::kR8UNormInt:
     case PixelFormat::kS8UInt:
       return 1u;
+    case PixelFormat::kR8G8UNormInt:
+      return 2u;
     case PixelFormat::kR8G8B8A8UNormInt:
     case PixelFormat::kR8G8B8A8UNormIntSRGB:
     case PixelFormat::kB8G8R8A8UNormInt:
@@ -399,7 +455,7 @@ struct Attachment {
   LoadAction load_action = LoadAction::kDontCare;
   StoreAction store_action = StoreAction::kStore;
 
-  constexpr operator bool() const { return static_cast<bool>(texture); }
+  bool IsValid() const;
 };
 
 struct ColorAttachment : public Attachment {

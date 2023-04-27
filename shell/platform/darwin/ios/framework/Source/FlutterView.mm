@@ -13,7 +13,6 @@
 #include "flutter/shell/common/platform_view.h"
 #include "flutter/shell/common/rasterizer.h"
 #import "flutter/shell/platform/darwin/ios/framework/Source/FlutterViewController_Internal.h"
-#import "flutter/shell/platform/darwin/ios/ios_surface_gl.h"
 #import "flutter/shell/platform/darwin/ios/ios_surface_software.h"
 #include "third_party/skia/include/utils/mac/SkCGUtils.h"
 
@@ -48,14 +47,19 @@
   if (self) {
     _delegate = delegate;
     self.layer.opaque = opaque;
+
+    // This line is necessary. CoreAnimation(or UIKit) may take this to do
+    // something to compute the final frame presented on screen, if we don't set this,
+    // it will make it take long time for us to take next CAMetalDrawable and will
+    // cause constant junk during rendering.
+    self.backgroundColor = UIColor.clearColor;
   }
 
   return self;
 }
 
 - (void)layoutSubviews {
-  if ([self.layer isKindOfClass:NSClassFromString(@"CAEAGLLayer")] ||
-      [self.layer isKindOfClass:NSClassFromString(@"CAMetalLayer")]) {
+  if ([self.layer isKindOfClass:NSClassFromString(@"CAMetalLayer")]) {
     CGFloat screenScale = [UIScreen mainScreen].scale;
     self.layer.allowsGroupOpacity = YES;
     self.layer.contentsScale = screenScale;

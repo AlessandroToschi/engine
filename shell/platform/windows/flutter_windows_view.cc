@@ -63,7 +63,8 @@ void FlutterWindowsView::SetEngine(
   // Set up the system channel handlers.
   auto internal_plugin_messenger = internal_plugin_registrar_->messenger();
   InitializeKeyboard();
-  platform_handler_ = PlatformHandler::Create(internal_plugin_messenger, this);
+  platform_handler_ =
+      std::make_unique<PlatformHandler>(internal_plugin_messenger, this);
   cursor_handler_ = std::make_unique<CursorHandler>(internal_plugin_messenger,
                                                     binding_handler_.get());
 
@@ -117,11 +118,8 @@ uint32_t FlutterWindowsView::GetFrameBufferId(size_t width, size_t height) {
 
 void FlutterWindowsView::ForceRedraw() {
   if (resize_status_ == ResizeState::kDone) {
-    // Request new frame
-    // TODO(knopp): Replace with more specific call once there is API for it
-    // https://github.com/flutter/flutter/issues/69716
-    SendWindowMetrics(resize_target_width_, resize_target_height_,
-                      binding_handler_->GetDpiScale());
+    // Request new frame.
+    engine_->ScheduleFrame();
   }
 }
 
@@ -161,6 +159,10 @@ void FlutterWindowsView::OnWindowSizeChanged(size_t width, size_t height) {
                           return resize_status == ResizeState::kDone;
                         });
   }
+}
+
+void FlutterWindowsView::OnWindowRepaint() {
+  ForceRedraw();
 }
 
 void FlutterWindowsView::OnPointerMove(double x,
@@ -260,6 +262,11 @@ void FlutterWindowsView::OnScroll(double x,
                                   int32_t device_id) {
   SendScroll(x, y, delta_x, delta_y, scroll_offset_multiplier, device_kind,
              device_id);
+}
+
+void FlutterWindowsView::OnScrollInertiaCancel(int32_t device_id) {
+  PointerLocation point = binding_handler_->GetPrimaryPointerLocation();
+  SendScrollInertiaCancel(device_id, point.x, point.y);
 }
 
 void FlutterWindowsView::OnUpdateSemanticsEnabled(bool enabled) {
@@ -498,6 +505,21 @@ void FlutterWindowsView::SendScroll(double x,
   SendPointerEventWithData(event, state);
 }
 
+void FlutterWindowsView::SendScrollInertiaCancel(int32_t device_id,
+                                                 double x,
+                                                 double y) {
+  auto state =
+      GetOrCreatePointerState(kFlutterPointerDeviceKindTrackpad, device_id);
+
+  FlutterPointerEvent event = {};
+  event.x = x;
+  event.y = y;
+  event.signal_kind =
+      FlutterPointerSignalKind::kFlutterPointerSignalKindScrollInertiaCancel;
+  SetEventPhaseFromCursorButtonState(&event, state);
+  SendPointerEventWithData(event, state);
+}
+
 void FlutterWindowsView::SendPointerEventWithData(
     const FlutterPointerEvent& event_data,
     PointerState* state) {
@@ -603,6 +625,8 @@ void FlutterWindowsView::CreateRenderSurface() {
     PhysicalWindowBounds bounds = binding_handler_->GetPhysicalWindowBounds();
     engine_->surface_manager()->CreateSurface(GetRenderTarget(), bounds.width,
                                               bounds.height);
+    resize_target_width_ = bounds.width;
+    resize_target_height_ = bounds.height;
   }
 }
 
@@ -610,6 +634,14 @@ void FlutterWindowsView::DestroyRenderSurface() {
   if (engine_ && engine_->surface_manager()) {
     engine_->surface_manager()->DestroySurface();
   }
+}
+
+void FlutterWindowsView::SendInitialAccessibilityFeatures() {
+  binding_handler_->SendInitialAccessibilityFeatures();
+}
+
+void FlutterWindowsView::UpdateHighContrastEnabled(bool enabled) {
+  engine_->UpdateHighContrastEnabled(enabled);
 }
 
 WindowsRenderTarget* FlutterWindowsView::GetRenderTarget() const {
@@ -622,6 +654,27 @@ PlatformWindow FlutterWindowsView::GetPlatformWindow() const {
 
 FlutterWindowsEngine* FlutterWindowsView::GetEngine() {
   return engine_.get();
+}
+
+void FlutterWindowsView::AnnounceAlert(const std::wstring& text) {
+  AccessibilityRootNode* root_node =
+      binding_handler_->GetAccessibilityRootNode();
+  AccessibilityAlert* alert =
+      binding_handler_->GetAccessibilityRootNode()->GetOrCreateAlert();
+  alert->SetText(text);
+  HWND hwnd = GetPlatformWindow();
+  NotifyWinEventWrapper(EVENT_SYSTEM_ALERT, hwnd, OBJID_CLIENT,
+                        AccessibilityRootNode::kAlertChildId);
+}
+
+void FlutterWindowsView::NotifyWinEventWrapper(DWORD event,
+                                               HWND hwnd,
+                                               LONG idObject,
+                                               LONG idChild) {
+  if (hwnd) {
+    NotifyWinEvent(EVENT_SYSTEM_ALERT, hwnd, OBJID_CLIENT,
+                   AccessibilityRootNode::kAlertChildId);
+  }
 }
 
 }  // namespace flutter

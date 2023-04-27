@@ -102,7 +102,7 @@ class Pipeline {
   };
 
   explicit Pipeline(uint32_t depth)
-      : depth_(depth), empty_(depth), available_(0), inflight_(0) {}
+      : empty_(depth), available_(0), inflight_(0) {}
 
   ~Pipeline() = default;
 
@@ -180,7 +180,6 @@ class Pipeline {
   }
 
  private:
-  const uint32_t depth_;
   fml::Semaphore empty_;
   fml::Semaphore available_;
   std::atomic<int> inflight_;
@@ -222,11 +221,11 @@ class Pipeline {
 };
 
 struct LayerTreeItem {
-  LayerTreeItem(std::unique_ptr<LayerTree> layer_tree,
+  LayerTreeItem(std::shared_ptr<LayerTree> layer_tree,
                 std::unique_ptr<FrameTimingsRecorder> frame_timings_recorder)
       : layer_tree(std::move(layer_tree)),
         frame_timings_recorder(std::move(frame_timings_recorder)) {}
-  std::unique_ptr<LayerTree> layer_tree;
+  std::shared_ptr<LayerTree> layer_tree;
   std::unique_ptr<FrameTimingsRecorder> frame_timings_recorder;
 };
 

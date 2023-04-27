@@ -46,6 +46,8 @@ class MockRasterCacheResult : public RasterCacheResult {
   SkRect device_rect_;
 };
 
+static std::vector<RasterCacheItem*> raster_cache_items_;
+
 /**
  * @brief A RasterCache implementation that simulates the act of rendering a
  * Layer or SkPicture without the overhead of rasterization or pixel storage.
@@ -59,51 +61,53 @@ class MockRasterCache : public RasterCache {
       size_t picture_and_display_list_cache_limit_per_frame =
           RasterCacheUtil::kDefaultPictureAndDispLayListCacheLimitPerFrame)
       : RasterCache(access_threshold,
-                    picture_and_display_list_cache_limit_per_frame) {}
+                    picture_and_display_list_cache_limit_per_frame) {
+    preroll_state_stack_.set_preroll_delegate(SkMatrix::I());
+    paint_state_stack_.set_delegate(&mock_canvas_);
+  }
 
   void AddMockLayer(int width, int height);
   void AddMockPicture(int width, int height);
 
  private:
+  LayerStateStack preroll_state_stack_;
+  LayerStateStack paint_state_stack_;
   MockCanvas mock_canvas_;
   SkColorSpace* color_space_ = mock_canvas_.imageInfo().colorSpace();
   MutatorsStack mutators_stack_;
   FixedRefreshRateStopwatch raster_time_;
   FixedRefreshRateStopwatch ui_time_;
-  TextureRegistry texture_registry_;
+  std::shared_ptr<TextureRegistry> texture_registry_;
   PrerollContext preroll_context_ = {
       // clang-format off
-      .raster_cache                  = nullptr,
+      .raster_cache                  = this,
       .gr_context                    = nullptr,
       .view_embedder                 = nullptr,
-      .mutators_stack                = mutators_stack_,
+      .state_stack                   = preroll_state_stack_,
       .dst_color_space               = color_space_,
-      .cull_rect                     = kGiantRect,
       .surface_needs_readback        = false,
       .raster_time                   = raster_time_,
       .ui_time                       = ui_time_,
       .texture_registry              = texture_registry_,
-      .checkerboard_offscreen_layers = false,
       .frame_device_pixel_ratio      = 1.0f,
       .has_platform_view             = false,
       .has_texture_layer             = false,
+      .raster_cached_entries         = &raster_cache_items_
       // clang-format on
   };
 
   PaintContext paint_context_ = {
       // clang-format off
-          .internal_nodes_canvas         = nullptr,
-          .leaf_nodes_canvas             = nullptr,
-          .gr_context                    = nullptr,
-          .dst_color_space               = color_space_,
-          .view_embedder                 = nullptr,
-          .raster_time                   = raster_time_,
-          .ui_time                       = ui_time_,
-          .texture_registry              = texture_registry_,
-          .raster_cache                  = nullptr,
-          .checkerboard_offscreen_layers = false,
-          .frame_device_pixel_ratio      = 1.0f,
-          .inherited_opacity             = SK_Scalar1,
+      .state_stack                   = paint_state_stack_,
+      .canvas                        = nullptr,
+      .gr_context                    = nullptr,
+      .dst_color_space               = color_space_,
+      .view_embedder                 = nullptr,
+      .raster_time                   = raster_time_,
+      .ui_time                       = ui_time_,
+      .texture_registry              = texture_registry_,
+      .raster_cache                  = nullptr,
+      .frame_device_pixel_ratio      = 1.0f,
       // clang-format on
   };
 };
@@ -119,16 +123,30 @@ struct PaintContextHolder {
 };
 
 PrerollContextHolder GetSamplePrerollContextHolder(
-    RasterCache* raster_cache = nullptr);
+    LayerStateStack& state_stack,
+    RasterCache* raster_cache,
+    FixedRefreshRateStopwatch* raster_time,
+    FixedRefreshRateStopwatch* ui_time);
 
 PaintContextHolder GetSamplePaintContextHolder(
-    RasterCache* raster_cache = nullptr);
+    LayerStateStack& state_stack,
+    RasterCache* raster_cache,
+    FixedRefreshRateStopwatch* raster_time,
+    FixedRefreshRateStopwatch* ui_time);
 
-bool DisplayListRasterCacheItemTryToRasterCache(
+bool RasterCacheItemPrerollAndTryToRasterCache(
     DisplayListRasterCacheItem& display_list_item,
     PrerollContext& context,
     PaintContext& paint_context,
     const SkMatrix& matrix);
+
+void RasterCacheItemPreroll(DisplayListRasterCacheItem& display_list_item,
+                            PrerollContext& context,
+                            const SkMatrix& matrix);
+
+bool RasterCacheItemTryToRasterCache(
+    DisplayListRasterCacheItem& display_list_item,
+    PaintContext& paint_context);
 
 }  // namespace testing
 }  // namespace flutter

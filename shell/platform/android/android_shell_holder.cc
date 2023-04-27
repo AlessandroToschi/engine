@@ -78,9 +78,9 @@ static PlatformData GetDefaultPlatformData() {
 }
 
 AndroidShellHolder::AndroidShellHolder(
-    flutter::Settings settings,
+    const flutter::Settings& settings,
     std::shared_ptr<PlatformViewAndroidJNI> jni_facade)
-    : settings_(std::move(settings)), jni_facade_(jni_facade) {
+    : settings_(settings), jni_facade_(jni_facade) {
   static size_t thread_host_count = 1;
   auto thread_label = std::to_string(thread_host_count++);
 
@@ -100,7 +100,7 @@ AndroidShellHolder::AndroidShellHolder(
   host_config.io_config = fml::Thread::ThreadConfig(
       flutter::ThreadHost::ThreadHostConfig::MakeThreadName(
           flutter::ThreadHost::Type::IO, thread_label),
-      fml::Thread::ThreadPriority::BACKGROUND);
+      fml::Thread::ThreadPriority::NORMAL);
 
   thread_host_ = std::make_shared<ThreadHost>(host_config);
 
@@ -164,7 +164,7 @@ AndroidShellHolder::AndroidShellHolder(
 
     shell_->RegisterImageDecoder(
         [runner = task_runners.GetIOTaskRunner()](sk_sp<SkData> buffer) {
-          return AndroidImageGenerator::MakeFromData(buffer, runner);
+          return AndroidImageGenerator::MakeFromData(std::move(buffer), runner);
         },
         -1);
     FML_DLOG(INFO) << "Registered Android SDK image decoder (API level 28+)";
@@ -181,7 +181,7 @@ AndroidShellHolder::AndroidShellHolder(
     const std::shared_ptr<ThreadHost>& thread_host,
     std::unique_ptr<Shell> shell,
     const fml::WeakPtr<PlatformViewAndroid>& platform_view)
-    : settings_(std::move(settings)),
+    : settings_(settings),
       jni_facade_(jni_facade),
       platform_view_(platform_view),
       thread_host_(thread_host),
@@ -259,8 +259,7 @@ std::unique_ptr<AndroidShellHolder> AndroidShellHolder::Spawn(
 
   // TODO(xster): could be worth tracing this to investigate whether
   // the IsolateConfiguration could be cached somewhere.
-  auto config = BuildRunConfiguration(asset_manager_, entrypoint, libraryUrl,
-                                      entrypoint_args);
+  auto config = BuildRunConfiguration(entrypoint, libraryUrl, entrypoint_args);
   if (!config) {
     // If the RunConfiguration was null, the kernel blob wasn't readable.
     // Fail the whole thing.
@@ -277,7 +276,7 @@ std::unique_ptr<AndroidShellHolder> AndroidShellHolder::Spawn(
 }
 
 void AndroidShellHolder::Launch(
-    std::shared_ptr<AssetManager> asset_manager,
+    std::unique_ptr<APKAssetProvider> apk_asset_provider,
     const std::string& entrypoint,
     const std::string& libraryUrl,
     const std::vector<std::string>& entrypoint_args) {
@@ -285,9 +284,8 @@ void AndroidShellHolder::Launch(
     return;
   }
 
-  asset_manager_ = asset_manager;
-  auto config = BuildRunConfiguration(asset_manager, entrypoint, libraryUrl,
-                                      entrypoint_args);
+  apk_asset_provider_ = std::move(apk_asset_provider);
+  auto config = BuildRunConfiguration(entrypoint, libraryUrl, entrypoint_args);
   if (!config) {
     return;
   }
@@ -314,7 +312,6 @@ void AndroidShellHolder::NotifyLowMemoryWarning() {
 }
 
 std::optional<RunConfiguration> AndroidShellHolder::BuildRunConfiguration(
-    std::shared_ptr<flutter::AssetManager> asset_manager,
     const std::string& entrypoint,
     const std::string& libraryUrl,
     const std::vector<std::string>& entrypoint_args) const {
@@ -333,21 +330,33 @@ std::optional<RunConfiguration> AndroidShellHolder::BuildRunConfiguration(
         IsolateConfiguration::CreateForKernel(std::move(kernel_blob));
   }
 
-  RunConfiguration config(std::move(isolate_configuration),
-                          std::move(asset_manager));
+  RunConfiguration config(std::move(isolate_configuration));
+  config.AddAssetResolver(apk_asset_provider_->Clone());
 
   {
     if (!entrypoint.empty() && !libraryUrl.empty()) {
-      config.SetEntrypointAndLibrary(std::move(entrypoint),
-                                     std::move(libraryUrl));
+      config.SetEntrypointAndLibrary(entrypoint, libraryUrl);
     } else if (!entrypoint.empty()) {
-      config.SetEntrypoint(std::move(entrypoint));
+      config.SetEntrypoint(entrypoint);
     }
     if (!entrypoint_args.empty()) {
-      config.SetEntrypointArgs(std::move(entrypoint_args));
+      config.SetEntrypointArgs(entrypoint_args);
     }
   }
   return config;
+}
+
+void AndroidShellHolder::PostTaskOnRasterThread(
+    const std::function<void(bool)>& task) {
+  fml::TaskRunner::RunNowOrPostTask(
+      shell_->GetTaskRunners().GetRasterTaskRunner(),
+      [task = std::move(task),
+       is_gpu_disabled_sync_switch = shell_->GetIsGpuDisabledSyncSwitch()] {
+        is_gpu_disabled_sync_switch->Execute(
+            fml::SyncSwitch::Handlers()
+                .SetIfFalse([&task] { task(false); })
+                .SetIfTrue([&task] { task(true); }));
+      });
 }
 
 }  // namespace flutter

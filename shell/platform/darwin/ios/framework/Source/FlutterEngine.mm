@@ -24,6 +24,7 @@
 #import "flutter/shell/platform/darwin/ios/framework/Source/FlutterIndirectScribbleDelegate.h"
 #import "flutter/shell/platform/darwin/ios/framework/Source/FlutterObservatoryPublisher.h"
 #import "flutter/shell/platform/darwin/ios/framework/Source/FlutterPlatformPlugin.h"
+#import "flutter/shell/platform/darwin/ios/framework/Source/FlutterSpellCheckPlugin.h"
 #import "flutter/shell/platform/darwin/ios/framework/Source/FlutterTextInputDelegate.h"
 #import "flutter/shell/platform/darwin/ios/framework/Source/FlutterUndoManagerDelegate.h"
 #import "flutter/shell/platform/darwin/ios/framework/Source/FlutterUndoManagerPlugin.h"
@@ -116,6 +117,7 @@ static constexpr int kNumProfilerSamplesPerSec = 5;
   fml::scoped_nsobject<FlutterPlatformPlugin> _platformPlugin;
   fml::scoped_nsobject<FlutterTextInputPlugin> _textInputPlugin;
   fml::scoped_nsobject<FlutterUndoManagerPlugin> _undoManagerPlugin;
+  fml::scoped_nsobject<FlutterSpellCheckPlugin> _spellCheckPlugin;
   fml::scoped_nsobject<FlutterRestorationPlugin> _restorationPlugin;
   fml::scoped_nsobject<FlutterMethodChannel> _localizationChannel;
   fml::scoped_nsobject<FlutterMethodChannel> _navigationChannel;
@@ -124,6 +126,8 @@ static constexpr int kNumProfilerSamplesPerSec = 5;
   fml::scoped_nsobject<FlutterMethodChannel> _platformViewsChannel;
   fml::scoped_nsobject<FlutterMethodChannel> _textInputChannel;
   fml::scoped_nsobject<FlutterMethodChannel> _undoManagerChannel;
+  fml::scoped_nsobject<FlutterMethodChannel> _scribbleChannel;
+  fml::scoped_nsobject<FlutterMethodChannel> _spellCheckChannel;
   fml::scoped_nsobject<FlutterBasicMessageChannel> _lifecycleChannel;
   fml::scoped_nsobject<FlutterBasicMessageChannel> _systemChannel;
   fml::scoped_nsobject<FlutterBasicMessageChannel> _settingsChannel;
@@ -283,7 +287,7 @@ static constexpr int kNumProfilerSamplesPerSec = 5;
   if (!self.platformView) {
     return;
   }
-  self.platformView->SetViewportMetrics(std::move(viewportMetrics));
+  self.platformView->SetViewportMetrics(viewportMetrics);
 }
 
 - (void)dispatchPointerDataPacket:(std::unique_ptr<flutter::PointerDataPacket>)packet {
@@ -390,7 +394,6 @@ static constexpr int kNumProfilerSamplesPerSec = 5;
 
 - (void)attachView {
   self.iosPlatformView->attachView();
-  [_textInputPlugin.get() setupIndirectScribbleInteraction:self.viewController];
 }
 
 - (void)setFlutterViewControllerWillDeallocObserver:(id<NSObject>)observer {
@@ -469,6 +472,12 @@ static constexpr int kNumProfilerSamplesPerSec = 5;
 - (FlutterMethodChannel*)undoManagerChannel {
   return _undoManagerChannel.get();
 }
+- (FlutterMethodChannel*)scribbleChannel {
+  return _scribbleChannel.get();
+}
+- (FlutterMethodChannel*)spellCheckChannel {
+  return _spellCheckChannel.get();
+}
 - (FlutterBasicMessageChannel*)lifecycleChannel {
   return _lifecycleChannel.get();
 }
@@ -494,10 +503,12 @@ static constexpr int kNumProfilerSamplesPerSec = 5;
   _platformViewsChannel.reset();
   _textInputChannel.reset();
   _undoManagerChannel.reset();
+  _scribbleChannel.reset();
   _lifecycleChannel.reset();
   _systemChannel.reset();
   _settingsChannel.reset();
   _keyEventChannel.reset();
+  _spellCheckChannel.reset();
 }
 
 - (void)startProfiler {
@@ -566,6 +577,16 @@ static constexpr int kNumProfilerSamplesPerSec = 5;
       binaryMessenger:self.binaryMessenger
                 codec:[FlutterJSONMethodCodec sharedInstance]]);
 
+  _scribbleChannel.reset([[FlutterMethodChannel alloc]
+         initWithName:@"flutter/scribble"
+      binaryMessenger:self.binaryMessenger
+                codec:[FlutterJSONMethodCodec sharedInstance]]);
+
+  _spellCheckChannel.reset([[FlutterMethodChannel alloc]
+         initWithName:@"flutter/spellcheck"
+      binaryMessenger:self.binaryMessenger
+                codec:[FlutterStandardMethodCodec sharedInstance]]);
+
   _lifecycleChannel.reset([[FlutterBasicMessageChannel alloc]
          initWithName:@"flutter/lifecycle"
       binaryMessenger:self.binaryMessenger
@@ -600,6 +621,7 @@ static constexpr int kNumProfilerSamplesPerSec = 5;
   _restorationPlugin.reset([[FlutterRestorationPlugin alloc]
          initWithChannel:_restorationChannel.get()
       restorationEnabled:_restorationEnabled]);
+  _spellCheckPlugin.reset([[FlutterSpellCheckPlugin alloc] init]);
 }
 
 - (void)maybeSetupPlatformViewChannels {
@@ -626,6 +648,12 @@ static constexpr int kNumProfilerSamplesPerSec = 5;
     [_undoManagerChannel.get()
         setMethodCallHandler:^(FlutterMethodCall* call, FlutterResult result) {
           [undoManagerPlugin handleMethodCall:call result:result];
+        }];
+
+    FlutterSpellCheckPlugin* spellCheckPlugin = _spellCheckPlugin.get();
+    [_spellCheckChannel.get()
+        setMethodCallHandler:^(FlutterMethodCall* call, FlutterResult result) {
+          [spellCheckPlugin handleMethodCall:call result:result];
         }];
   }
 }
@@ -699,7 +727,7 @@ static constexpr int kNumProfilerSamplesPerSec = 5;
   host_config.io_config =
       fml::Thread::ThreadConfig(flutter::ThreadHost::ThreadHostConfig::MakeThreadName(
                                     flutter::ThreadHost::Type::IO, threadLabel.UTF8String),
-                                fml::Thread::ThreadPriority::BACKGROUND);
+                                fml::Thread::ThreadPriority::NORMAL);
 
   return (flutter::ThreadHost){host_config};
 }
@@ -769,9 +797,9 @@ static void SetEntryPoint(flutter::Settings* settings, NSString* entrypoint, NSS
       [UIApplication sharedApplication].applicationState == UIApplicationStateBackground;
   // Create the shell. This is a blocking operation.
   std::unique_ptr<flutter::Shell> shell = flutter::Shell::Create(
-      /*platform_data=*/std::move(platformData),
-      /*task_runners=*/std::move(task_runners),
-      /*settings=*/std::move(settings),
+      /*platform_data=*/platformData,
+      /*task_runners=*/task_runners,
+      /*settings=*/settings,
       /*on_create_platform_view=*/on_create_platform_view,
       /*on_create_rasterizer=*/on_create_rasterizer,
       /*is_gpu_disabled=*/_isGpuDisabled);
@@ -947,6 +975,9 @@ static void SetEntryPoint(flutter::Settings* settings, NSString* entrypoint, NSS
 #pragma mark - FlutterViewEngineDelegate
 
 - (void)flutterTextInputView:(FlutterTextInputView*)textInputView showToolbar:(int)client {
+  // TODO(justinmc): Switch from the TextInputClient to Scribble channel when
+  // the framework has finished transitioning to the Scribble channel.
+  // https://github.com/flutter/flutter/pull/115296
   [_textInputChannel.get() invokeMethod:@"TextInputClient.showToolbar" arguments:@[ @(client) ]];
 }
 
@@ -954,6 +985,9 @@ static void SetEntryPoint(flutter::Settings* settings, NSString* entrypoint, NSS
                   focusElement:(UIScribbleElementIdentifier)elementIdentifier
                        atPoint:(CGPoint)referencePoint
                         result:(FlutterResult)callback {
+  // TODO(justinmc): Switch from the TextInputClient to Scribble channel when
+  // the framework has finished transitioning to the Scribble channel.
+  // https://github.com/flutter/flutter/pull/115296
   [_textInputChannel.get()
       invokeMethod:@"TextInputClient.focusElement"
          arguments:@[ elementIdentifier, @(referencePoint.x), @(referencePoint.y) ]
@@ -963,6 +997,9 @@ static void SetEntryPoint(flutter::Settings* settings, NSString* entrypoint, NSS
 - (void)flutterTextInputPlugin:(FlutterTextInputPlugin*)textInputPlugin
          requestElementsInRect:(CGRect)rect
                         result:(FlutterResult)callback {
+  // TODO(justinmc): Switch from the TextInputClient to Scribble channel when
+  // the framework has finished transitioning to the Scribble channel.
+  // https://github.com/flutter/flutter/pull/115296
   [_textInputChannel.get()
       invokeMethod:@"TextInputClient.requestElementsInRect"
          arguments:@[ @(rect.origin.x), @(rect.origin.y), @(rect.size.width), @(rect.size.height) ]
@@ -970,10 +1007,16 @@ static void SetEntryPoint(flutter::Settings* settings, NSString* entrypoint, NSS
 }
 
 - (void)flutterTextInputViewScribbleInteractionBegan:(FlutterTextInputView*)textInputView {
+  // TODO(justinmc): Switch from the TextInputClient to Scribble channel when
+  // the framework has finished transitioning to the Scribble channel.
+  // https://github.com/flutter/flutter/pull/115296
   [_textInputChannel.get() invokeMethod:@"TextInputClient.scribbleInteractionBegan" arguments:nil];
 }
 
 - (void)flutterTextInputViewScribbleInteractionFinished:(FlutterTextInputView*)textInputView {
+  // TODO(justinmc): Switch from the TextInputClient to Scribble channel when
+  // the framework has finished transitioning to the Scribble channel.
+  // https://github.com/flutter/flutter/pull/115296
   [_textInputChannel.get() invokeMethod:@"TextInputClient.scribbleInteractionFinished"
                               arguments:nil];
 }
@@ -981,12 +1024,18 @@ static void SetEntryPoint(flutter::Settings* settings, NSString* entrypoint, NSS
 - (void)flutterTextInputView:(FlutterTextInputView*)textInputView
     insertTextPlaceholderWithSize:(CGSize)size
                        withClient:(int)client {
+  // TODO(justinmc): Switch from the TextInputClient to Scribble channel when
+  // the framework has finished transitioning to the Scribble channel.
+  // https://github.com/flutter/flutter/pull/115296
   [_textInputChannel.get() invokeMethod:@"TextInputClient.insertTextPlaceholder"
                               arguments:@[ @(client), @(size.width), @(size.height) ]];
 }
 
 - (void)flutterTextInputView:(FlutterTextInputView*)textInputView
        removeTextPlaceholder:(int)client {
+  // TODO(justinmc): Switch from the TextInputClient to Scribble channel when
+  // the framework has finished transitioning to the Scribble channel.
+  // https://github.com/flutter/flutter/pull/115296
   [_textInputChannel.get() invokeMethod:@"TextInputClient.removeTextPlaceholder"
                               arguments:@[ @(client) ]];
 }

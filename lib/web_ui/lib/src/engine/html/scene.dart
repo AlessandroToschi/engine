@@ -17,6 +17,16 @@ class SurfaceScene implements ui.Scene {
 
   final DomElement? webOnlyRootElement;
 
+  @override
+  Future<void> renderToSurface(ui.RenderSurface renderSurface, {bool flipVertical = false}) async {
+    throw UnimplementedError('renderToSurface is not implemented for web');
+  }
+
+  @override
+  Future<Object?> toCanvas(int width, int height) {
+    throw UnimplementedError('renderToSurface is not implemented for web');
+  }
+
   /// Creates a raster image representation of the current state of the scene.
   /// This is a slow operation that is performed on a background thread.
   @override
@@ -25,8 +35,8 @@ class SurfaceScene implements ui.Scene {
   }
 
   @override
-  ui.Image toGpuImage(int width, int height) {
-    throw UnsupportedError('toGpuImage is not supported on the Web');
+  ui.Image toImageSync(int width, int height) {
+    throw UnsupportedError('toImageSync is not supported on the Web');
   }
 
   /// Releases the resources used by this scene.
@@ -38,7 +48,7 @@ class SurfaceScene implements ui.Scene {
 
 /// A surface that creates a DOM element for whole app.
 class PersistedScene extends PersistedContainerSurface {
-  PersistedScene(PersistedScene? oldLayer) : super(oldLayer) {
+  PersistedScene(PersistedScene? super.oldLayer) {
     transform = Matrix4.identity();
   }
 
@@ -48,8 +58,8 @@ class PersistedScene extends PersistedContainerSurface {
     // TODO(yjbanov): in the add2app scenario where we might be hosted inside
     //                a custom element, this will be different. We will need to
     //                update this code when we add add2app support.
-    final double screenWidth = domWindow.innerWidth!.toDouble();
-    final double screenHeight = domWindow.innerHeight!.toDouble();
+    final double screenWidth = domWindow.innerWidth!;
+    final double screenHeight = domWindow.innerHeight!;
     localClipBounds = ui.Rect.fromLTRB(0, 0, screenWidth, screenHeight);
     projectedClip = null;
   }

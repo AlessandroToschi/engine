@@ -5,8 +5,10 @@
 #ifndef FLUTTER_DISPLAY_LIST_DISPLAY_LIST_H_
 #define FLUTTER_DISPLAY_LIST_DISPLAY_LIST_H_
 
+#include <memory>
 #include <optional>
 
+#include "flutter/display_list/display_list_rtree.h"
 #include "flutter/display_list/display_list_sampling_options.h"
 #include "flutter/display_list/types.h"
 #include "flutter/fml/logging.h"
@@ -88,6 +90,7 @@ namespace flutter {
   V(SetPodColorSource)              \
   V(SetSkColorSource)               \
   V(SetImageColorSource)            \
+  V(SetRuntimeEffectColorSource)    \
                                     \
   V(ClearImageFilter)               \
   V(SetPodImageFilter)              \
@@ -226,8 +229,7 @@ class DisplayList : public SkRefCnt {
     Dispatch(ctx, ptr, ptr + byte_count_);
   }
 
-  void RenderTo(DisplayListBuilder* builder,
-                SkScalar opacity = SK_Scalar1) const;
+  void RenderTo(DisplayListBuilder* builder) const;
 
   void RenderTo(SkCanvas* canvas, SkScalar opacity = SK_Scalar1) const;
 
@@ -254,13 +256,20 @@ class DisplayList : public SkRefCnt {
     return bounds_;
   }
 
+  sk_sp<const DlRTree> rtree() {
+    if (!rtree_) {
+      ComputeRTree();
+    }
+    return rtree_;
+  }
+
   bool Equals(const DisplayList* other) const;
   bool Equals(const DisplayList& other) const { return Equals(&other); }
   bool Equals(sk_sp<const DisplayList> other) const {
     return Equals(other.get());
   }
 
-  bool can_apply_group_opacity() { return can_apply_group_opacity_; }
+  bool can_apply_group_opacity() const { return can_apply_group_opacity_; }
 
   static void DisposeOps(uint8_t* ptr, uint8_t* end);
 
@@ -273,7 +282,10 @@ class DisplayList : public SkRefCnt {
               const SkRect& cull_rect,
               bool can_apply_group_opacity);
 
-  std::unique_ptr<uint8_t, SkFunctionWrapper<void(void*), sk_free>> storage_;
+  struct SkFreeDeleter {
+    void operator()(uint8_t* p) { sk_free(p); }
+  };
+  std::unique_ptr<uint8_t, SkFreeDeleter> storage_;
   size_t byte_count_;
   unsigned int op_count_;
 
@@ -282,6 +294,7 @@ class DisplayList : public SkRefCnt {
 
   uint32_t unique_id_;
   SkRect bounds_;
+  sk_sp<const DlRTree> rtree_;
 
   // Only used for drawPaint() and drawColor()
   SkRect bounds_cull_;
@@ -289,6 +302,7 @@ class DisplayList : public SkRefCnt {
   bool can_apply_group_opacity_;
 
   void ComputeBounds();
+  void ComputeRTree();
   void Dispatch(Dispatcher& ctx, uint8_t* ptr, uint8_t* end) const;
 
   friend class DisplayListBuilder;

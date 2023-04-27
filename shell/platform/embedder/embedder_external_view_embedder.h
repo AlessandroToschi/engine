@@ -40,7 +40,7 @@ class EmbedderExternalViewEmbedder final : public ExternalViewEmbedder {
   /// @brief      Creates an external view embedder used by the generic embedder
   ///             API.
   ///
-  /// @param[in] avoid_backing_store_cache If set, create_render_target callback
+  /// @param[in] avoid_backing_store_cache If set, create_render_target_callback
   ///                                      will beinvoked every frame for every
   ///                                      engine composited layer. The result
   ///                                      will not cached.
@@ -94,7 +94,10 @@ class EmbedderExternalViewEmbedder final : public ExternalViewEmbedder {
   std::vector<SkCanvas*> GetCurrentCanvases() override;
 
   // |ExternalViewEmbedder|
-  SkCanvas* CompositeEmbeddedView(int view_id) override;
+  std::vector<DisplayListBuilder*> GetCurrentBuilders() override;
+
+  // |ExternalViewEmbedder|
+  EmbedderPaintContext CompositeEmbeddedView(int view_id) override;
 
   // |ExternalViewEmbedder|
   void SubmitFrame(GrDirectContext* context,

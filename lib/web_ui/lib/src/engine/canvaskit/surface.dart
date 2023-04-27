@@ -13,27 +13,27 @@ import '../util.dart';
 import '../window.dart';
 import 'canvas.dart';
 import 'canvaskit_api.dart';
-import 'initialization.dart';
+import 'renderer.dart';
 import 'surface_factory.dart';
 import 'util.dart';
 
 // Only supported in profile/release mode. Allows Flutter to use MSAA but
 // removes the ability for disabling AA on Paint objects.
 const bool _kUsingMSAA =
-    bool.fromEnvironment('flutter.canvaskit.msaa', defaultValue: false);
+    bool.fromEnvironment('flutter.canvaskit.msaa');
 
 typedef SubmitCallback = bool Function(SurfaceFrame, CkCanvas);
 
 /// A frame which contains a canvas to be drawn into.
 class SurfaceFrame {
-  final CkSurface skiaSurface;
-  final SubmitCallback submitCallback;
-  bool _submitted;
-
   SurfaceFrame(this.skiaSurface, this.submitCallback)
       : _submitted = false,
-        assert(skiaSurface != null), // ignore: unnecessary_null_comparison
-        assert(submitCallback != null); // ignore: unnecessary_null_comparison
+        assert(skiaSurface != null),
+        assert(submitCallback != null);
+
+  final CkSurface skiaSurface;
+  final SubmitCallback submitCallback;
+  final bool _submitted;
 
   /// Submit this frame to be drawn.
   bool submit() {
@@ -84,6 +84,8 @@ class Surface {
   int? _glContext;
   int? _skiaCacheBytes;
 
+  SkGrContext? get grContext => _grContext;
+
   /// The root HTML element for this surface.
   ///
   /// This element contains the canvas used to draw the UI. Unlike the canvas,
@@ -131,7 +133,7 @@ class Surface {
 
   void addToScene() {
     if (!_addedToScene) {
-      skiaSceneHost!.prepend(htmlElement);
+      CanvasKitRenderer.instance.sceneHost!.prepend(htmlElement);
     }
     _addedToScene = true;
   }
@@ -142,11 +144,6 @@ class Surface {
 
   /// Creates a <canvas> and SkSurface for the given [size].
   CkSurface createOrUpdateSurface(ui.Size size) {
-    if (useH5vccCanvasKit) {
-      _surface ??= CkSurface(canvasKit.getH5vccSkSurface(), null);
-      return _surface!;
-    }
-
     if (size.isEmpty) {
       throw CanvasKitError('Cannot create surfaces of empty size.');
     }
@@ -161,6 +158,7 @@ class Surface {
       // The existing surface is still reusable.
       if (window.devicePixelRatio != _currentDevicePixelRatio) {
         _updateLogicalHtmlCanvasSize();
+        _translateCanvas();
       }
       return _surface!;
     }
@@ -177,6 +175,9 @@ class Surface {
       // new canvas larger than required to avoid many canvas creations.
       final ui.Size newSize = previousCanvasSize == null ? size : size * 1.4;
 
+      // If we have a surface, send a dummy command to its canvas to make its context
+      // current or else disposing the context could fail below.
+      _surface?.getCanvas().clear(const ui.Color(0x00000000));
       _surface?.dispose();
       _surface = null;
       _addedToScene = false;
@@ -328,7 +329,7 @@ class Surface {
           antialias: _kUsingMSAA ? 1 : 0,
           majorVersion: webGLVersion,
         ),
-      );
+      ).toInt();
 
       _glContext = glContext;
 
@@ -430,8 +431,8 @@ class CkSurface {
 
   int? get context => _glContext;
 
-  int width() => surface.width();
-  int height() => surface.height();
+  int width() => surface.width().toInt();
+  int height() => surface.height().toInt();
 
   void dispose() {
     if (_isDisposed) {

@@ -97,7 +97,7 @@ class DebugSurfaceStats {
 DomCanvasRenderingContext2D? _debugSurfaceStatsOverlayCtx;
 
 void debugRepaintSurfaceStatsOverlay(PersistedScene scene) {
-  final int overlayWidth = domWindow.innerWidth!;
+  final int overlayWidth = domWindow.innerWidth!.toInt();
   const int rowHeight = 30;
   const int rowCount = 4;
   const int overlayHeight = rowHeight * rowCount;
@@ -110,18 +110,18 @@ void debugRepaintSurfaceStatsOverlay(PersistedScene scene) {
   }
 
   if (_debugSurfaceStatsOverlayCtx == null) {
-    final DomCanvasElement _debugSurfaceStatsOverlay = createDomCanvasElement(
+    final DomCanvasElement debugSurfaceStatsOverlay = createDomCanvasElement(
       width: overlayWidth,
       height: overlayHeight,
     );
-    _debugSurfaceStatsOverlay.style
+    debugSurfaceStatsOverlay.style
       ..position = 'fixed'
       ..left = '0'
       ..top = '0'
       ..zIndex = '1000'
       ..opacity = '0.8';
-    _debugSurfaceStatsOverlayCtx = _debugSurfaceStatsOverlay.context2D;
-    domDocument.body!.append(_debugSurfaceStatsOverlay);
+    _debugSurfaceStatsOverlayCtx = debugSurfaceStatsOverlay.context2D;
+    domDocument.body!.append(debugSurfaceStatsOverlay);
   }
 
   _debugSurfaceStatsOverlayCtx!
@@ -237,7 +237,7 @@ void debugPrintSurfaceStats(PersistedScene scene, int frameNumber) {
 
   void countReusesRecursively(PersistedSurface surface) {
     final DebugSurfaceStats stats = surfaceStatsFor(surface);
-    assert(stats != null); // ignore: unnecessary_null_comparison
+    assert(stats != null);
 
     surfaceRetainCount += stats.retainSurfaceCount;
     elementReuseCount += stats.reuseElementCount;
@@ -296,7 +296,7 @@ void debugPrintSurfaceStats(PersistedScene scene, int frameNumber) {
     final int pixelCount = canvasElements
         .cast<DomCanvasElement>()
         .map<int>((DomCanvasElement e) {
-      final int pixels = e.width! * e.height!;
+      final int pixels = (e.width! * e.height!).toInt();
       canvasInfo.writeln('    - ${e.width!} x ${e.height!} = $pixels pixels');
       return pixels;
     }).fold(0, (int total, int pixels) => total + pixels);

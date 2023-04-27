@@ -42,6 +42,14 @@ void debugRestoreWebDecoderExpireDuration() {
 
 /// Image decoder backed by the browser's `ImageDecoder`.
 class CkBrowserImageDecoder implements ui.Codec {
+  CkBrowserImageDecoder._({
+    required this.contentType,
+    required this.targetWidth,
+    required this.targetHeight,
+    required this.data,
+    required this.debugSource,
+  });
+
   static Future<CkBrowserImageDecoder> create({
     required Uint8List data,
     required String debugSource,
@@ -55,7 +63,7 @@ class CkBrowserImageDecoder implements ui.Codec {
     if (contentType == null) {
       final String fileHeader;
       if (data.isNotEmpty) {
-        fileHeader = '[' + bytesToHexString(data.sublist(0, math.min(10, data.length))) + ']';
+        fileHeader = '[${bytesToHexString(data.sublist(0, math.min(10, data.length)))}]';
       } else {
         fileHeader = 'empty';
       }
@@ -78,14 +86,6 @@ class CkBrowserImageDecoder implements ui.Codec {
     await decoder._getOrCreateWebDecoder();
     return decoder;
   }
-
-  CkBrowserImageDecoder._({
-    required this.contentType,
-    required this.targetWidth,
-    required this.targetHeight,
-    required this.data,
-    required this.debugSource,
-  });
 
   final String contentType;
   final int? targetWidth;
@@ -179,9 +179,14 @@ class CkBrowserImageDecoder implements ui.Codec {
       // package:js bindings don't work with getters that return a Promise, which
       // is why js_util is used instead.
       await promiseToFuture<void>(getJsProperty(webDecoder, 'completed'));
-      frameCount = webDecoder.tracks.selectedTrack!.frameCount;
-      repetitionCount = webDecoder.tracks.selectedTrack!.repetitionCount;
+      frameCount = webDecoder.tracks.selectedTrack!.frameCount.toInt();
 
+      // We coerce the DOM's `repetitionCount` into an int by explicitly
+      // handling `infinity`. Note: This will still throw if the DOM returns a
+      // `NaN.
+      final double rawRepetitionCount = webDecoder.tracks.selectedTrack!.repetitionCount;
+      repetitionCount = rawRepetitionCount == double.infinity ? -1 :
+          rawRepetitionCount.toInt();
       _cachedWebDecoder = webDecoder;
 
       // Expire the decoder if it's not used for several seconds. If the image is
@@ -205,13 +210,13 @@ class CkBrowserImageDecoder implements ui.Codec {
       if (domInstanceOfString(error, 'DOMException')) {
         if ((error as DomException).name == DomException.notSupported) {
           throw ImageCodecException(
-            'Image file format ($contentType) is not supported by this browser\'s ImageDecoder API.\n'
+            "Image file format ($contentType) is not supported by this browser's ImageDecoder API.\n"
             'Image source: $debugSource',
           );
         }
       }
       throw ImageCodecException(
-        'Failed to decode image using the browser\'s ImageDecoder API.\n'
+        "Failed to decode image using the browser's ImageDecoder API.\n"
         'Image source: $debugSource\n'
         'Original browser error: $error'
       );
@@ -234,19 +239,19 @@ class CkBrowserImageDecoder implements ui.Codec {
         alphaType: canvasKit.AlphaType.Premul,
         colorType: canvasKit.ColorType.RGBA_8888,
         colorSpace: SkColorSpaceSRGB,
-        width: frame.displayWidth,
-        height: frame.displayHeight,
+        width: frame.displayWidth.toInt(),
+        height: frame.displayHeight.toInt(),
       ),
     );
 
     // Duration can be null if the image is not animated. However, Flutter
     // requires a non-null value. 0 indicates that the frame is meant to be
     // displayed indefinitely, which is fine for a static image.
-    final Duration duration = Duration(microseconds: frame.duration ?? 0);
+    final Duration duration = Duration(microseconds: frame.duration?.toInt() ?? 0);
 
     if (skImage == null) {
       throw ImageCodecException(
-        'Failed to create image from pixel data decoded using the browser\'s ImageDecoder.',
+        "Failed to create image from pixel data decoded using the browser's ImageDecoder.",
       );
     }
 
@@ -445,7 +450,7 @@ bool _shouldReadPixelsUnmodified(VideoFrame videoFrame, ui.ImageByteFormat forma
 }
 
 Future<ByteBuffer> readVideoFramePixelsUnmodified(VideoFrame videoFrame) async {
-  final int size = videoFrame.allocationSize();
+  final int size = videoFrame.allocationSize().toInt();
   final Uint8List destination = Uint8List(size);
   final JsPromise copyPromise = videoFrame.copyTo(destination);
   await promiseToFuture<void>(copyPromise);
@@ -453,8 +458,8 @@ Future<ByteBuffer> readVideoFramePixelsUnmodified(VideoFrame videoFrame) async {
 }
 
 Future<Uint8List> encodeVideoFrameAsPng(VideoFrame videoFrame) async {
-  final int width = videoFrame.displayWidth;
-  final int height = videoFrame.displayHeight;
+  final int width = videoFrame.displayWidth.toInt();
+  final int height = videoFrame.displayHeight.toInt();
   final DomCanvasElement canvas = createDomCanvasElement(width: width, height:
       height);
   final DomCanvasRenderingContext2D ctx = canvas.context2D;

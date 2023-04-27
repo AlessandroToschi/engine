@@ -8,11 +8,14 @@ import 'dart:typed_data';
 import 'package:ui/ui.dart' as ui;
 
 import '../../browser_detection.dart';
+import '../../color_filter.dart';
 import '../../dom.dart';
+import '../../embedder.dart';
 import '../../safe_browser_api.dart';
 import '../../util.dart';
 import '../../validators.dart';
 import '../../vector_math.dart';
+import '../color_filter.dart';
 import '../path/path_utils.dart';
 import '../render_vertices.dart';
 import 'normalized_gradient.dart';
@@ -54,16 +57,22 @@ abstract class EngineGradient implements ui.Gradient {
   /// Creates a CanvasImageSource to paint gradient.
   Object createImageBitmap(
       ui.Rect? shaderBounds, double density, bool createDataUrl);
+
+  @override
+  bool debugDisposed = false;
+
+  @override
+  void dispose() {}
 }
 
 class GradientSweep extends EngineGradient {
   GradientSweep(this.center, this.colors, this.colorStops, this.tileMode,
       this.startAngle, this.endAngle, this.matrix4)
       : assert(offsetIsValid(center)),
-        assert(colors != null), // ignore: unnecessary_null_comparison
-        assert(tileMode != null), // ignore: unnecessary_null_comparison
-        assert(startAngle != null), // ignore: unnecessary_null_comparison
-        assert(endAngle != null), // ignore: unnecessary_null_comparison
+        assert(colors != null),
+        assert(tileMode != null),
+        assert(startAngle != null),
+        assert(endAngle != null),
         assert(startAngle < endAngle),
         super._() {
     validateColorStops(colors, colorStops);
@@ -150,7 +159,7 @@ class GradientSweep extends EngineGradient {
         'float angle = atan(-localCoord.y, -localCoord.x) + ${math.pi};');
     method.addStatement('float sweep = angle_range.y - angle_range.x;');
     method.addStatement('angle = (angle - angle_range.x) / sweep;');
-    method.addStatement(''
+    method.addStatement(
         'float st = angle;');
 
     final String probeName =
@@ -180,8 +189,8 @@ class GradientLinear extends EngineGradient {
     Float32List? matrix,
   )   : assert(offsetIsValid(from)),
         assert(offsetIsValid(to)),
-        assert(colors != null), // ignore: unnecessary_null_comparison
-        assert(tileMode != null), // ignore: unnecessary_null_comparison
+        assert(colors != null),
+        assert(tileMode != null),
         matrix4 = matrix == null ? null : FastMatrix32(matrix),
         super._() {
     if (assertionsEnabled) {
@@ -304,7 +313,7 @@ class GradientLinear extends EngineGradient {
     // We compute location based on gl_FragCoord to center distance which
     // returns 0.0 at center. To make sure we align center of gradient to this
     // point, we shift by 0.5 to get st value for center of gradient.
-    gradientTransform.translate(0.5, 0);
+    gradientTransform.translate(0.5);
     if (length > kFltEpsilon) {
       gradientTransform.scale(1.0 / length);
     }
@@ -588,7 +597,7 @@ class GradientRadial extends EngineGradient {
     method.addStatement(
         'vec4 localCoord = vec4(gl_FragCoord.x - center.x, center.y - gl_FragCoord.y, 0, 1) * m_gradient;');
     method.addStatement('float dist = length(localCoord);');
-    method.addStatement(''
+    method.addStatement(
         'float st = abs(dist / u_radius);');
     final String probeName =
         _writeSharedGradientShader(builder, method, gradient, tileMode);
@@ -619,7 +628,7 @@ class GradientConical extends GradientRadial {
       ui.Rect? shaderBounds, double density) {
     if ((tileMode == ui.TileMode.clamp || tileMode == ui.TileMode.decal) &&
         focalRadius == 0.0 &&
-        focal == const ui.Offset(0, 0)) {
+        focal == ui.Offset.zero) {
       return _createCanvasGradient(ctx, shaderBounds, density);
     } else {
       initWebGl();
@@ -717,8 +726,9 @@ class _BlurEngineImageFilter extends EngineImageFilter {
 
   @override
   bool operator ==(Object other) {
-    if (other.runtimeType != runtimeType)
+    if (other.runtimeType != runtimeType) {
       return false;
+    }
     return other is _BlurEngineImageFilter &&
         other.tileMode == tileMode &&
         other.sigmaX == sigmaX &&
@@ -748,8 +758,9 @@ class _MatrixEngineImageFilter extends EngineImageFilter {
 
   @override
   bool operator ==(Object other) {
-    if (other.runtimeType != runtimeType)
+    if (other.runtimeType != runtimeType) {
       return false;
+    }
     return other is _MatrixEngineImageFilter
         && other.filterQuality == filterQuality
         && listEquals<double>(other.webMatrix, webMatrix);
@@ -762,4 +773,131 @@ class _MatrixEngineImageFilter extends EngineImageFilter {
   String toString() {
     return 'ImageFilter.matrix($webMatrix, $filterQuality)';
   }
+}
+
+/// The backend implementation of [ui.ColorFilter]
+///
+/// Currently only 'mode' and 'matrix' are supported.
+abstract class EngineHtmlColorFilter implements EngineImageFilter {
+  EngineHtmlColorFilter();
+
+  String? filterId;
+
+  @override
+  String get filterAttribute => (filterId != null) ? 'url(#$filterId)' : '';
+
+  @override
+  String get transformAttribute => '';
+
+  /// Make an [SvgFilter] and add it as a globabl resource using [flutterViewEmbedder]
+  /// The [DomElement] from the made [SvgFilter] is returned so it can be managed
+  /// by the surface calling it.
+  DomElement? makeSvgFilter(DomElement? filterElement);
+}
+
+class ModeHtmlColorFilter extends EngineHtmlColorFilter {
+  ModeHtmlColorFilter(this.color, this.blendMode);
+
+  final ui.Color color;
+  ui.BlendMode blendMode;
+
+  @override
+  DomElement? makeSvgFilter(DomElement? filterElement) {
+    switch (blendMode) {
+      case ui.BlendMode.clear:
+      case ui.BlendMode.dstOut:
+      case ui.BlendMode.srcOut:
+        filterElement!.style.visibility = 'hidden';
+        return null;
+      case ui.BlendMode.dst:
+      case ui.BlendMode.dstIn:
+        // Noop.
+        return null;
+      case ui.BlendMode.src:
+      case ui.BlendMode.srcOver:
+        // Uses source filter color.
+        // Since we don't have a size, we can't use background color.
+        // Use svg filter srcIn instead.
+        blendMode = ui.BlendMode.srcIn;
+        break;
+      case ui.BlendMode.dstOver:
+      case ui.BlendMode.srcIn:
+      case ui.BlendMode.srcATop:
+      case ui.BlendMode.dstATop:
+      case ui.BlendMode.xor:
+      case ui.BlendMode.plus:
+      case ui.BlendMode.modulate:
+      case ui.BlendMode.screen:
+      case ui.BlendMode.overlay:
+      case ui.BlendMode.darken:
+      case ui.BlendMode.lighten:
+      case ui.BlendMode.colorDodge:
+      case ui.BlendMode.colorBurn:
+      case ui.BlendMode.hardLight:
+      case ui.BlendMode.softLight:
+      case ui.BlendMode.difference:
+      case ui.BlendMode.exclusion:
+      case ui.BlendMode.multiply:
+      case ui.BlendMode.hue:
+      case ui.BlendMode.saturation:
+      case ui.BlendMode.color:
+      case ui.BlendMode.luminosity:
+        break;
+    }
+
+    final SvgFilter svgFilter = svgFilterFromBlendMode(color, blendMode);
+    flutterViewEmbedder.addResource(svgFilter.element);
+    filterId = svgFilter.id;
+
+    if (blendMode == ui.BlendMode.saturation ||
+        blendMode == ui.BlendMode.multiply ||
+        blendMode == ui.BlendMode.modulate) {
+          filterElement!.style.backgroundColor = colorToCssString(color)!;
+    }
+    return svgFilter.element;
+  }
+}
+
+class MatrixHtmlColorFilter extends EngineHtmlColorFilter {
+  MatrixHtmlColorFilter(this.matrix);
+
+  final List<double> matrix;
+
+  @override
+  DomElement? makeSvgFilter(DomNode? filterElement) {
+    final SvgFilter svgFilter = svgFilterFromColorMatrix(matrix);
+    flutterViewEmbedder.addResource(svgFilter.element);
+    filterId = svgFilter.id;
+    return svgFilter.element;
+  }
+}
+
+/// Convert the current [ColorFilter] to an EngineHtmlColorFilter
+///
+/// This workaround allows ColorFilter to be const constructible and
+/// efficiently comparable, so that widgets can check for COlorFIlter equality to
+/// avoid repainting.
+EngineHtmlColorFilter? createHtmlColorFilter(EngineColorFilter? colorFilter) {
+  if (colorFilter == null) {
+    return null;
+  }
+  switch (colorFilter.type) {
+      case ColorFilterType.mode:
+        if (colorFilter.color == null || colorFilter.blendMode == null) {
+          return null;
+        }
+        return ModeHtmlColorFilter(colorFilter.color!, colorFilter.blendMode!);
+      case ColorFilterType.matrix:
+        if (colorFilter.matrix == null) {
+          return null;
+        }
+        assert(colorFilter.matrix!.length == 20, 'Color Matrix must have 20 entries.');
+        return MatrixHtmlColorFilter(colorFilter.matrix!);
+      case ColorFilterType.linearToSrgbGamma:
+        throw UnimplementedError('ColorFilter.linearToSrgbGamma not implemented for HTML renderer');
+      case ColorFilterType.srgbToLinearGamma:
+        throw UnimplementedError('ColorFilter.srgbToLinearGamma not implemented for HTML renderer.');
+      default:
+        throw StateError('Unknown mode $colorFilter.type for ColorFilter.');
+    }
 }

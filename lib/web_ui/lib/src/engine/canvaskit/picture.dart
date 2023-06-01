@@ -113,9 +113,9 @@ class CkPicture extends ManagedSkiaObject<SkPicture> implements ui.Picture {
   CkImage toImageSync(int width, int height) {
     assert(debugCheckNotDisposed('Cannot convert picture to image.'));
 
-    final Surface surface = SurfaceFactory.instance.pictureToImageSurface;
+    final Surface surface = SurfaceFactory.instance.baseSurface;
     final CkSurface ckSurface =
-      surface.createOrUpdateSurface(ui.Size(width.toDouble(), height.toDouble()));
+      surface.createRenderTargetSurface(ui.Size(width.toDouble(), height.toDouble()));
     final CkCanvas ckCanvas = ckSurface.getCanvas();
     ckCanvas.clear(const ui.Color(0x00000000));
     ckCanvas.drawPicture(this);
@@ -132,6 +132,7 @@ class CkPicture extends ManagedSkiaObject<SkPicture> implements ui.Picture {
     if (rasterImage == null) {
       throw StateError('Unable to convert image pixels into SkImage.');
     }
+    ckSurface.dispose();
     return CkImage(rasterImage);
   }
 

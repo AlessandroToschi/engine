@@ -196,7 +196,6 @@ class LayerSceneBuilder implements ui.SceneBuilder {
     ui.Offset offset = ui.Offset.zero,
     ui.EngineLayer? oldLayer,
   }) {
-    // throw UnimplementedError('not implemented');
     return pushLayer<BlendEngineLayer>(BlendEngineLayer(alpha, blendMode, offset));
   }
 

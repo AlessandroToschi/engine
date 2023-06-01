@@ -28,7 +28,7 @@ vars = {
   # This prevents us from downloading the Emscripten toolchain for builds
   # which do not build for the web. This toolchain is needed to build CanvasKit
   # for the web engine.
-  'download_emsdk': False,
+  'download_emsdk': True,
 
   # For experimental features some dependencies may only be avaialable in the master/main
   # channels. This variable is being set when CI is checking out the repository.
@@ -107,10 +107,10 @@ vars = {
   # The vulnerabiity database being used in this scan can be browsed
   # using this UI https://osv.dev/list
   # If a new dependency needs to be added, the upstream (non-mirrored)
-  # git URL for that dependency should be added to this list 
+  # git URL for that dependency should be added to this list
   # with the key-value pair being:
   # 'upstream_[dep name from last slash and before .git in URL]':'[git URL]'
-  # example: 
+  # example:
   "upstream_abseil-cpp": "https://github.com/abseil/abseil-cpp.git",
   "upstream_angle": "https://github.com/google/angle.git",
   "upstream_archive": "https://github.com/brendan-duncan/archive.git",

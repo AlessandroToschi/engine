@@ -129,8 +129,6 @@ extension CanvasKitExtension on CanvasKit {
     SkData skData,
   ) => _getDataBytes(skData).toDart;
 
-  external SkSurface? MakeRenderTarget(SkGrContext grContext, int width, int height);
-
   // Text decoration enum is embedded in the CanvasKit object itself.
   @JS('NoDecoration')
   external JSNumber get _NoDecoration;

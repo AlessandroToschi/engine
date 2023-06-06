@@ -180,7 +180,7 @@ class LayerStateStack {
 
     void applyBlendOpacity(const SkRect& bound,
                            SkScalar opacity,
-                           SkBlendMode blend_mode);
+                           DlBlendMode blend_mode);
 
     // Records the image filter for application at the next call to
     // saveLayer or applyState. A saveLayer may be executed at
@@ -342,7 +342,7 @@ class LayerStateStack {
   void push_opacity(const SkRect& rect, SkScalar opacity);
   void push_blend_opacity(const SkRect& rect,
                           SkScalar opacity,
-                          SkBlendMode blend_mode);
+                          DlBlendMode blend_mode);
   void push_color_filter(const SkRect& bounds,
                          const std::shared_ptr<const DlColorFilter>& filter);
   void push_image_filter(const SkRect& bounds,

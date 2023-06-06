@@ -8,10 +8,10 @@
 #include "flutter/flow/surface.h"
 #include "flutter/fml/trace_event.h"
 #include "flutter/shell/common/snapshot_controller.h"
-#include "third_party/skia/include/core/SkColorSpace.h"
 #include "fml/build_config.h"
+#include "third_party/skia/include/core/SkColorSpace.h"
 #include "third_party/skia/include/core/SkSurface.h"
-
+#include "third_party/skia/include/gpu/ganesh/SkImageGanesh.h"
 namespace flutter {
 
 namespace {
@@ -72,10 +72,14 @@ sk_sp<DlImage> SnapshotControllerSkia::MakeFromTexture(int64_t raw_texture,
   color_type = kRGBA_8888_SkColorType;
 #endif
   static const auto color_space = SkColorSpace::MakeSRGB();
-  const auto image = SkImage::MakeFromTexture(
-      GetDelegate().GetSurface()->GetContext(), texture,
-      kTopLeft_GrSurfaceOrigin, color_type, kPremul_SkAlphaType, color_space);
-  return sk_make_sp<DlImageSkia>(image);
+  const auto& delegate = GetDelegate();
+  if (delegate.GetSurface() && delegate.GetSurface()->GetContext()) {
+    const auto image = SkImages::BorrowTextureFrom(
+        delegate.GetSurface()->GetContext(), texture, kTopLeft_GrSurfaceOrigin,
+        color_type, kPremul_SkAlphaType, color_space);
+    return DlImage::Make(image);
+  }
+  return nullptr;
 }
 
 std::unique_ptr<Surface> SnapshotControllerSkia::MakeOffscreenSurface(
@@ -234,8 +238,8 @@ std::unique_ptr<SurfaceFrame>
 SnapshotControllerSkia::OffscreenSkiaSurface::AcquireFrame(
     const SkISize& size) {
   auto submit_callback = [](const SurfaceFrame& surface_frame,
-                            SkCanvas* canvas) -> bool {
-    canvas->flush();
+                            DlCanvas* canvas) -> bool {
+    canvas->Flush();
     return true;
   };
   SurfaceFrame::FramebufferInfo framebuffer_info;

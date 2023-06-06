@@ -112,6 +112,9 @@ flutter::CanvasImage::CreateFromTexturePointer(int64_t texture_pointer,
       dart_state->IsImpellerEnabled(), texture_pointer,
       SkISize::Make(width, height), std::move(snapshot_delegate),
       std::move(raster_task_runner), std::move(unref_queue));
+  if (!dl_image) {
+    return nullptr;
+  }
   image->set_image(dl_image);
   return image;
 }

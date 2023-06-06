@@ -892,7 +892,7 @@ class RenderSurface extends engine.ManagedSkiaObject<engine.SkSurface> {
 
     return skSurface;
   }
-  
+
   void toBytes(ByteBuffer buffer) {
     if (rawSkiaObject == null) {
       throw Exception('Failed to create GPU-backed SkSurface for RenderSurface');

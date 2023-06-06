@@ -178,7 +178,7 @@ public interface FlutterPlugin {
     public FlutterEngineGroup getEngineGroup() {
       return group;
     }
-    
+
     public void runOnRasterThread(Task task) {
       flutterEngine.runOnRasterThread(task);
     }

@@ -687,8 +687,8 @@ void LayerStateStack::push_blend_opacity(const SkRect& bounds,
                                          SkScalar opacity,
                                          DlBlendMode blend_mode) {
   if (blend_mode != DlBlendMode::kSrcOver) {
-    state_stack_.emplace_back(std::make_unique<SaveLayerEntry>(
-        bounds, blend_mode, outstanding_));
+    state_stack_.emplace_back(
+        std::make_unique<SaveLayerEntry>(bounds, blend_mode, outstanding_));
     apply_last_entry();
   }
   push_opacity(bounds, opacity);

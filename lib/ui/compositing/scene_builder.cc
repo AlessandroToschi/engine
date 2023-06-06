@@ -145,7 +145,8 @@ void SceneBuilder::pushBlend(Dart_Handle layer_handle,
                              int blendMode,
                              fml::RefPtr<EngineLayer> oldLayer) {
   auto layer = std::make_shared<flutter::BlendLayer>(
-      alpha, SkPoint::Make(dx, dy), static_cast<SkBlendMode>(blendMode));
+      alpha, SkPoint::Make((SkScalar)dx, (SkScalar)dy),
+      static_cast<DlBlendMode>(blendMode));
   PushLayer(layer);
   EngineLayer::MakeRetained(layer_handle, layer);
 

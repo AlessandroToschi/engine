@@ -12,7 +12,7 @@ namespace flutter {
 
 BlendLayer::BlendLayer(SkAlpha alpha,
                        const SkPoint& offset,
-                       SkBlendMode blend_mode)
+                       DlBlendMode blend_mode)
     : CacheableContainerLayer(std::numeric_limits<int>::max(), true),
       alpha_(alpha),
       offset_(offset),
@@ -31,8 +31,7 @@ void BlendLayer::Diff(DiffContext* context, const Layer* old_layer) {
   }
   context->PushTransform(SkMatrix::Translate(offset_.fX, offset_.fY));
   if (context->has_raster_cache()) {
-    context->SetTransform(
-        RasterCacheUtil::GetIntegralTransCTM(context->GetTransform()));
+    context->WillPaintWithIntegralTransform();
   }
   DiffChildren(context, prev);
   context->SetLayerPaintRegion(this, context->CurrentSubtreeRegion());

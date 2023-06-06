@@ -18,7 +18,11 @@ namespace flutter {
 
 sk_sp<DlImage> SnapshotControllerImpeller::MakeFromTexture(int64_t raw_texture,
                                                            SkISize size) {
-  impeller::AiksContext* context = GetDelegate().GetSurface()->GetAiksContext();
+  const auto& delegate = GetDelegate();
+  if (!delegate.GetSurface() || !delegate.GetAiksContext()) {
+    return nullptr;
+  }
+  auto context = GetDelegate().GetSurface()->GetAiksContext();
   impeller::TextureDescriptor desc;
   desc.storage_mode = impeller::StorageMode::kHostVisible;
   desc.format = impeller::PixelFormat::kB8G8R8A8UNormInt;
@@ -53,7 +57,7 @@ std::unique_ptr<Surface> SnapshotControllerImpeller::MakeOffscreenSurface(
   auto offscreen_render_target =
       impeller::RenderTarget::CreateOffscreenFromTexture(raw_texture, *context,
                                                          surface_size);
-  return std::make_unique<OffscreenImpellerSurface>(aiks_context,
+  return std::make_unique<OffscreenImpellerSurface>(aiks_context.get(),
                                                     offscreen_render_target);
 }
 
@@ -120,7 +124,7 @@ SnapshotControllerImpeller::OffscreenImpellerSurface::AcquireFrame(
       std::weak_ptr<impeller::RenderTarget>(_render_target);
   const auto submit_callback = fml::MakeCopyable(
       [aiks_context = _aiks_context, weak_render_target = weak_render_target](
-          SurfaceFrame& surface_frame, SkCanvas* canvas) mutable -> bool {
+          SurfaceFrame& surface_frame, DlCanvas* canvas) mutable -> bool {
         if (!aiks_context) {
           return false;
         }

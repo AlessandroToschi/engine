@@ -92,6 +92,7 @@ def main():
   build("./flutter/ci/builders/clay_builders/android_debug.json")
   build("./flutter/ci/builders/clay_builders/android_aot.json")
   build("./flutter/ci/builders/clay_builders/ios.json")
+  build("./flutter/ci/builders/clay_builders/web.json")
 
   os.environ["PATH"] = PATH
   set_use_prebuild_dart_sdk(False)

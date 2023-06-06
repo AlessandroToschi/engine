@@ -274,7 +274,7 @@ std::shared_ptr<RenderTarget> RenderTarget::CreateOffscreenFromTexture(
 
   TextureDescriptor stencil_tex0;
   stencil_tex0.storage_mode = stencil_storage_mode;
-  stencil_tex0.format = PixelFormat::kDefaultStencil;
+  stencil_tex0.format = PixelFormat::kS8UInt;
   stencil_tex0.size = size;
   stencil_tex0.usage =
       static_cast<TextureUsageMask>(TextureUsage::kRenderTarget);

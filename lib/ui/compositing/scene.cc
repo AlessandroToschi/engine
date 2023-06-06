@@ -103,9 +103,8 @@ void Scene::renderToSurface(fml::RefPtr<RenderSurface> render_surface,
 
         fml::TaskRunner::RunNowOrPostTask(
             std::move(ui_task_runner),
-            [ui_task = std::move(ui_task),
-             success = raster_status != RasterStatus::kSuccess] {
-              ui_task(success);
+            [ui_task = std::move(ui_task), raster_status] {
+              ui_task(raster_status == RasterStatus::kSuccess);
             });
       });
 

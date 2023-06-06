@@ -27,7 +27,7 @@ class BlendLayer : public CacheableContainerLayer {
   // the retained rendering inefficient as a small offset change could propagate
   // to many leaf layers. Therefore we try to capture that offset here to stop
   // the propagation as repainting the BlendLayer is expensive.
-  BlendLayer(SkAlpha alpha, const SkPoint& offset, SkBlendMode blend_mode);
+  BlendLayer(SkAlpha alpha, const SkPoint& offset, DlBlendMode blend_mode);
 
   void Diff(DiffContext* context, const Layer* old_layer) override;
 
@@ -39,18 +39,18 @@ class BlendLayer : public CacheableContainerLayer {
   // and modifying their rendering accordingly. This value is only guaranteed
   // to be valid after the local |Preroll| method is called.
   bool children_can_accept_opacity() const {
-    return children_can_accept_opacity_ && blend_mode_ == SkBlendMode::kSrcOver;
+    return children_can_accept_opacity_ && blend_mode_ == DlBlendMode::kSrcOver;
   }
   void set_children_can_accept_opacity(bool value) {
     children_can_accept_opacity_ = value;
   }
 
-  SkScalar opacity() const { return alpha_ * 1.0 / SK_AlphaOPAQUE; }
+  SkScalar opacity() const { return alpha_ * 1.0f / SK_AlphaOPAQUE; }
 
  private:
   SkAlpha alpha_;
   SkPoint offset_;
-  SkBlendMode blend_mode_;
+  DlBlendMode blend_mode_;
   bool children_can_accept_opacity_;
 
   FML_DISALLOW_COPY_AND_ASSIGN(BlendLayer);

@@ -87,7 +87,7 @@ class Scene extends NativeFieldWrapperClass1 {
     return completer.future;
   }
 
-  @FfiNative<Void Function(Pointer<Void>, Handle, Bool, Handle)>('Scene::renderToSurface')
+  @Native<Void Function(Pointer<Void>, Handle, Bool, Handle)>(symbol: 'Scene::renderToSurface')
   external void _renderToSurface(RenderSurface renderSurface, bool flipY, _Callback<bool> callback);
 }
 

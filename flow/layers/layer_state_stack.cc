@@ -537,7 +537,7 @@ void MutatorContext::applyOpacity(const SkRect& bounds, SkScalar opacity) {
 
 void MutatorContext::applyBlendOpacity(const SkRect& bounds,
                                        SkScalar opacity,
-                                       SkBlendMode blend_mode) {
+                                       DlBlendMode blend_mode) {
   layer_state_stack_->push_blend_opacity(bounds, opacity, blend_mode);
 }
 
@@ -685,10 +685,10 @@ void LayerStateStack::push_opacity(const SkRect& bounds, SkScalar opacity) {
 
 void LayerStateStack::push_blend_opacity(const SkRect& bounds,
                                          SkScalar opacity,
-                                         SkBlendMode blend_mode) {
-  if (blend_mode != SkBlendMode::kSrcOver) {
+                                         DlBlendMode blend_mode) {
+  if (blend_mode != DlBlendMode::kSrcOver) {
     state_stack_.emplace_back(std::make_unique<SaveLayerEntry>(
-        bounds, ToDl(blend_mode), outstanding_));
+        bounds, blend_mode, outstanding_));
     apply_last_entry();
   }
   push_opacity(bounds, opacity);

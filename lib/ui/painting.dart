@@ -2216,6 +2216,7 @@ Future<Codec> instantiateImageCodec(
   int? targetWidth,
   int? targetHeight,
   bool allowUpscaling = true,
+  bool mipmapped = true,
 }) async {
   final ImmutableBuffer buffer = await ImmutableBuffer.fromUint8List(list);
   return instantiateImageCodecFromBuffer(
@@ -2223,6 +2224,7 @@ Future<Codec> instantiateImageCodec(
     targetWidth: targetWidth,
     targetHeight: targetHeight,
     allowUpscaling: allowUpscaling,
+    mipmapped: mipmapped
   );
 }
 
@@ -2270,6 +2272,7 @@ Future<Codec> instantiateImageCodecFromBuffer(
   int? targetWidth,
   int? targetHeight,
   bool allowUpscaling = true,
+  bool mipmapped = true,
 }) {
   return instantiateImageCodecWithSize(
     buffer,
@@ -2284,6 +2287,7 @@ Future<Codec> instantiateImageCodecFromBuffer(
       }
       return TargetImageSize(width: targetWidth, height: targetHeight);
     },
+    mipmapped: mipmapped,
   );
 }
 
@@ -2325,6 +2329,7 @@ Future<Codec> instantiateImageCodecFromBuffer(
 Future<Codec> instantiateImageCodecWithSize(
   ImmutableBuffer buffer, {
   TargetImageSizeCallback? getTargetSize,
+  bool mipmapped = true,
 }) async {
   getTargetSize ??= _getDefaultImageSize;
   final ImageDescriptor descriptor = await ImageDescriptor.encoded(buffer);
@@ -2335,6 +2340,7 @@ Future<Codec> instantiateImageCodecWithSize(
     return descriptor.instantiateCodec(
       targetWidth: targetSize.width,
       targetHeight: targetSize.height,
+      mipmapped: mipmapped,
     );
   } finally {
     buffer.dispose();
@@ -2404,12 +2410,12 @@ class TargetImageSize {
 /// This is a convenience wrapper around [instantiateImageCodec]. Prefer using
 /// [instantiateImageCodec] which also supports multi frame images and offers
 /// better error handling. This function swallows asynchronous errors.
-void decodeImageFromList(Uint8List list, ImageDecoderCallback callback) {
-  _decodeImageFromListAsync(list, callback);
+void decodeImageFromList(Uint8List list, ImageDecoderCallback callback, {bool mipmapped = true}) {
+  _decodeImageFromListAsync(list, callback, mipmapped);
 }
 
-Future<void> _decodeImageFromListAsync(Uint8List list, ImageDecoderCallback callback) async {
-  final Codec codec = await instantiateImageCodec(list);
+Future<void> _decodeImageFromListAsync(Uint8List list, ImageDecoderCallback callback, bool mipmapped) async {
+  final Codec codec = await instantiateImageCodec(list, mipmapped: mipmapped);
   final FrameInfo frameInfo = await codec.getNextFrame();
   callback(frameInfo.image);
 }
@@ -2448,6 +2454,7 @@ void decodeImageFromPixels(
   int? targetWidth,
   int? targetHeight,
   bool allowUpscaling = true,
+  bool mipmapped = true,
 }) {
   if (targetWidth != null) {
     assert(allowUpscaling || targetWidth <= width);
@@ -2479,6 +2486,7 @@ void decodeImageFromPixels(
         .instantiateCodec(
           targetWidth: targetWidth,
           targetHeight: targetHeight,
+          mipmapped: mipmapped,
         )
         .then((Codec codec) {
           final Future<FrameInfo> frameInfo = codec.getNextFrame();
@@ -6588,7 +6596,7 @@ class ImageDescriptor extends NativeFieldWrapperClass1 {
   ///
   /// If either targetWidth or targetHeight is less than or equal to zero, it
   /// will be treated as if it is null.
-  Future<Codec> instantiateCodec({int? targetWidth, int? targetHeight}) async {
+  Future<Codec> instantiateCodec({int? targetWidth, int? targetHeight, bool mipmapped = true}) async {
     if (targetWidth != null && targetWidth <= 0) {
       targetWidth = null;
     }
@@ -6610,12 +6618,12 @@ class ImageDescriptor extends NativeFieldWrapperClass1 {
     assert(targetHeight != null);
 
     final Codec codec = Codec._();
-    _instantiateCodec(codec, targetWidth!, targetHeight!);
+    _instantiateCodec(codec, targetWidth!, targetHeight!, mipmapped);
     return codec;
   }
 
-  @Native<Void Function(Pointer<Void>, Handle, Int32, Int32)>(symbol: 'ImageDescriptor::instantiateCodec')
-  external void _instantiateCodec(Codec outCodec, int targetWidth, int targetHeight);
+  @Native<Void Function(Pointer<Void>, Handle, Int32, Int32, Bool)>(symbol: 'ImageDescriptor::instantiateCodec')
+  external void _instantiateCodec(Codec outCodec, int targetWidth, int targetHeight, bool mipmapped);
 }
 
 class RenderSurface extends NativeFieldWrapperClass1 {

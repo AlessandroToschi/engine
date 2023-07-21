@@ -16,10 +16,10 @@ vars = {
   'github_git': 'https://github.com',
   'skia_git': 'https://skia.googlesource.com',
   'llvm_git': 'https://llvm.googlesource.com',
-  'clay_skia_git': 'https://github.com/plexagon/skia',
+  'clay_skia_git': 'https://github.com/plexagon',
   # OCMock is for testing only so there is no google clone
   'ocmock_git': 'https://github.com/erikdoe/ocmock.git',
-  'skia_revision': 'fb20cd240044b9c6a2b2d28af8b66c0f9097c7b4',
+  'skia_revision': 'f5a10600c46b569b4e0c835141ec4e83b02fa77b',
 
   # WARNING: DO NOT EDIT canvaskit_cipd_instance MANUALLY
   # See `lib/web_ui/README.md` for how to roll CanvasKit to a new version.
@@ -562,7 +562,7 @@ deps = {
    Var('dart_git') + '/root_certificates.git' + '@' + Var('dart_root_certificates_rev'),
 
   'src/third_party/skia':
-   Var('clay_skia_git') + '/skia.git' + '@' +  Var('skia_revision'),
+   'git@github.com:plexagon/skia.git' + '@' +  Var('skia_revision'),
 
   'src/third_party/ocmock':
    Var('ocmock_git') + '@' +  Var('ocmock_rev'),

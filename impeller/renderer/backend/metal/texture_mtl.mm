@@ -19,11 +19,6 @@ TextureMTL::TextureMTL(TextureDescriptor p_desc,
     return;
   }
 
-  if (desc.size != GetSize()) {
-    VALIDATION_LOG << "The texture and its descriptor disagree about its size.";
-    return;
-  }
-
   is_wrapped_ = wrapped;
   is_valid_ = true;
 }

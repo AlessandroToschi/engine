@@ -476,6 +476,7 @@ Future<Codec> instantiateImageCodec(
   int? targetWidth,
   int? targetHeight,
   bool allowUpscaling = true,
+  bool mipmapped = true,
 }) => engine.renderer.instantiateImageCodec(
   list,
   targetWidth: targetWidth,
@@ -533,7 +534,7 @@ Future<Codec> webOnlyInstantiateImageCodecFromUrl(Uri uri,
   {engine.WebOnlyImageCodecChunkCallback? chunkCallback}) =>
   engine.renderer.instantiateImageCodecFromUrl(uri, chunkCallback: chunkCallback);
 
-void decodeImageFromList(Uint8List list, ImageDecoderCallback callback) {
+void decodeImageFromList(Uint8List list, ImageDecoderCallback callback, {bool mipmapped = true}) {
   _decodeImageFromListAsync(list, callback);
 }
 

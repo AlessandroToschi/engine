@@ -126,6 +126,7 @@ abstract class Renderer {
     int? targetWidth,
     int? targetHeight,
     bool allowUpscaling = true,
+    bool mipmapped = true,
   });
 
   Future<ui.Codec> instantiateImageCodecFromUrl(

@@ -163,7 +163,7 @@ class SkwasmRenderer implements Renderer {
   }
 
   @override
-  Future<ui.Codec> instantiateImageCodec(Uint8List list, {int? targetWidth, int? targetHeight, bool allowUpscaling = true}) {
+  Future<ui.Codec> instantiateImageCodec(Uint8List list, {int? targetWidth, int? targetHeight, bool allowUpscaling = true, bool mipmapped = true}) {
     throw UnimplementedError('instantiateImageCodec not yet implemented');
   }
 

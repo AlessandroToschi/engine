@@ -215,7 +215,8 @@ class CanvasKitRenderer implements Renderer {
     Uint8List list, {
     int? targetWidth,
     int? targetHeight,
-    bool allowUpscaling = true
+    bool allowUpscaling = true,
+    bool mipmapped = true,
   }) async => skiaInstantiateImageCodec(
     list,
     targetWidth,

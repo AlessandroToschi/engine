@@ -31,8 +31,9 @@ std::shared_ptr<TextureMTL> TextureMTL::Wrapper(TextureDescriptor desc,
 std::shared_ptr<TextureMTL> TextureMTL::TexturePointerWrapper(
     TextureDescriptor desc,
     int64_t texture_pointer) {
-  id<MTLTexture> texture =
-      (__bridge id)(reinterpret_cast<void*>(texture_pointer));
+  void* texture_void_pointer = reinterpret_cast<void*>(texture_pointer);
+  id<MTLTexture> texture = (__bridge id)texture_void_pointer;
+  CFRelease(texture_void_pointer);
   return TextureMTL::Wrapper(desc, texture);
 }
 

@@ -395,7 +395,8 @@ Rasterizer::MakeSkiaGpuImageFromTexture(int64_t raw_texture,
 sk_sp<DlImage> Rasterizer::MakeImpellerGpuImageFromTexture(
     int64_t raw_texture,
     const SkISize& size) {
-#if defined(IMPELLER_SUPPORTS_RENDERING) && defined(FML_OS_IOS)
+#if defined(IMPELLER_SUPPORTS_RENDERING) && \
+    (defined(FML_OS_IOS) || defined(FML_OS_MACOSX))
   sk_sp<flutter::DlImage> result;
   delegate_.GetIsGpuDisabledSyncSwitch()->Execute(
       fml::SyncSwitch::Handlers()

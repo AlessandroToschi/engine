@@ -52,7 +52,7 @@ sk_sp<DlImage> SnapshotControllerSkia::MakeFromTexture(int64_t raw_texture,
                                                        SkISize size) {
   GrBackendTexture texture;
   SkColorType color_type;
-#ifdef FML_OS_ANDROID
+#if defined(FML_OS_ANDROID)
   // GL_RGBA8 0x8058_(OES)
   uint32_t format = 0x8058;
   // GL_TEXTURE_EXTERNAL_OES
@@ -62,7 +62,7 @@ sk_sp<DlImage> SnapshotControllerSkia::MakeFromTexture(int64_t raw_texture,
   texture = GrBackendTexture{size.width(), size.height(), GrMipMapped::kNo,
                              texture_info};
   color_type = SkColorType::kRGBA_8888_SkColorType;
-#elif FML_OS_IOS
+#elif defined(FML_OS_IOS) || defined(FML_OS_MACOSX)
   GrMtlTextureInfo texture_info;
   texture_info.fTexture =
       sk_cfp<const void*>(reinterpret_cast<const void*>(raw_texture));
@@ -89,7 +89,7 @@ std::unique_ptr<Surface> SnapshotControllerSkia::MakeOffscreenSurface(
     const SkISize& size) {
   GrBackendTexture texture;
   SkColorType color_type;
-#ifdef FML_OS_ANDROID
+#if defined(FML_OS_ANDROID)
   GrGLTextureInfo texture_info;
   texture_info.fTarget = 0x0DE1;  // GR_GL_TEXTURE2D_2D;
   texture_info.fID = raw_texture;
@@ -97,7 +97,7 @@ std::unique_ptr<Surface> SnapshotControllerSkia::MakeOffscreenSurface(
   texture = GrBackendTexture{size.width(), size.height(), GrMipMapped::kNo,
                              texture_info};
   color_type = SkColorType::kRGBA_8888_SkColorType;
-#elif FML_OS_IOS
+#elif defined(FML_OS_IOS) || defined(FML_OS_MACOSX)
   GrMtlTextureInfo texture_info;
   texture_info.fTexture =
       sk_cfp<const void*>(reinterpret_cast<const void*>(raw_texture));

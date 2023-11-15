@@ -71,7 +71,8 @@ class TestImpellerAllocator : public impeller::Allocator {
 
   ~TestImpellerAllocator() = default;
 
-  std::shared_ptr<Texture> WrapTexture(const TextureDescriptor& desc, int64_t raw_texture) const override {
+  std::shared_ptr<Texture> WrapTexture(const TextureDescriptor& desc,
+                                       int64_t raw_texture) const override {
     return nullptr;
   }
 

@@ -19,12 +19,14 @@ class EmbedderExternalTextureMetal : public flutter::Texture {
       std::unique_ptr<FlutterMetalExternalTexture>(int64_t, size_t, size_t)>;
 
   EmbedderExternalTextureMetal(int64_t texture_identifier,
-                               const ExternalTextureCallback& callback);
+                               const ExternalTextureCallback& callback,
+                               bool enable_impeller);
 
   ~EmbedderExternalTextureMetal();
 
  private:
   const ExternalTextureCallback& external_texture_callback_;
+  bool enable_impeller_;
   sk_sp<DlImage> last_image_;
 
   sk_sp<DlImage> ResolveTexture(int64_t texture_id,
